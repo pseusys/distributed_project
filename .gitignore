@@ -5,6 +5,8 @@
 # Build system config and build directory
 .gradle
 build
+bin
+out
 
 # Compiled class file
 *.class
