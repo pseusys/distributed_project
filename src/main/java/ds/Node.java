@@ -1,4 +1,4 @@
-package main.java.ds;
+package ds;
 
 public class Node {
     public int id;

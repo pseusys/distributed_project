@@ -1,4 +1,4 @@
-package main.java.ds;
+package ds;
 
 import java.util.ArrayList;
 import java.util.List;
