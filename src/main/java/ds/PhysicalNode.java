@@ -1,6 +1,7 @@
 package ds;
 
 import com.rabbitmq.client.*;
+import com.rabbitmq.client.impl.nio.NioParams;
 
 import java.io.*;
 import java.util.concurrent.TimeoutException;
@@ -18,6 +19,10 @@ public class PhysicalNode extends Node {
 
     private final Connection connection; //to open and close separately
 
+    private int round_counter = 1;
+    private int neighbor_counter = 0;   //for each round
+    private int real_neighbors = 0;
+
     public PhysicalNode(int id, int nodesNumber, int[] neighbors) {
         this.id = id;
         this.nodesNumber = nodesNumber;
@@ -32,19 +37,39 @@ public class PhysicalNode extends Node {
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost("localhost");
+            factory.useNio();
+            factory.setNioParams(new NioParams().setNbIoThreads(2));
             this.connection = factory.newConnection();
             this.channel = connection.createChannel();
-            this.channel.queueDeclare(String.valueOf(id), false, false, false, null);
+
+            // we create a queue for every neighbor with name this.id + neighbor.id
+            for (int i = 0; i < neighbors.length; i++) {
+                int neighbor = neighbors[i];
+                if (neighbor != -1) {
+                    this.channel.queueDeclare(String.valueOf(id) + "-" + i, false, false, false, null);
+                    this.channel.queueDeclare(i + "-" + String.valueOf(id), false, false, false, null);
+                    real_neighbors++;
+                    System.out.println(id + " " + i);
+                }
+            }
 
             processMsg();
         } catch (IOException | TimeoutException e) {
             throw new RuntimeException(e);
         }
 
+    }
+
+    public int[][] getRoutingTable() {
+        return routingTable;
+    }
+
+    public void start() {
+        System.out.println("Start " + id);
         //send a msg to the neighbors
         for (int i = 0; i < neighbors.length; i++)
             if (neighbors[i] != -1)
-                sendMsg(new MessageObj(this.routingTable, this.id), this.neighbors[i]);
+                sendMsg(new MessageObj(this.routingTable, this.id), i);
     }
 
     public void sendMsg(MessageObj msg, int neighbor) {
@@ -52,7 +77,7 @@ public class PhysicalNode extends Node {
         byte[] byteMsg = getByteArray(msg);
 
         try {
-            channel.basicPublish("", String.valueOf(neighbor),
+            channel.basicPublish("", String.valueOf(id) + "-" + neighbor,
                     MessageProperties.PERSISTENT_TEXT_PLAIN,
                     byteMsg);
             //System.out.println(this.id + " sent " + msg.getMsg());
@@ -85,13 +110,34 @@ public class PhysicalNode extends Node {
 
             //receiveMsg
             //update routing table
+            neighbor_counter++;
             updateRoutingTable(message);
-
+            System.out.println(id + " updated " + neighbor_counter + " " + real_neighbors);
+            if (neighbor_counter == real_neighbors) {
+                System.out.println("here");
+                neighbor_counter = 0;
+                round_counter++;
+                if (round_counter < nodesNumber) {
+                    for (int i = 0; i < neighbors.length; i++) {
+                        if (neighbors[i] != -1)
+                            sendMsg(new MessageObj(this.routingTable, this.id), this.neighbors[i]);
+                    }
+                }
+                System.out.println(this.id + " all rounds are finished");
+            }
+            System.out.println(id + " finished");
         };
         boolean autoAck = true; // acknowledgment is covered below
         try {
-            channel.basicConsume(String.valueOf(id), autoAck, deliverCallback, consumerTag -> {
-            });
+            for (int i = 0; i < neighbors.length; i++) {
+                int neighbor = neighbors[i];
+                if (neighbor != -1) {
+                    channel.basicConsume(i + "-" + String.valueOf(id), autoAck, deliverCallback, consumerTag -> {
+                    });
+                    System.out.println(id + " received " + i);
+                }
+            }
+            System.out.println("after for");
         } catch (IOException e) {
             //todo: change?
             throw new RuntimeException(e);
