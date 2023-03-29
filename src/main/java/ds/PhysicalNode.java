@@ -31,7 +31,7 @@ public class PhysicalNode extends Node {
 
         for (int i = 0; i < nodesNumber; i++) {
             if (i == id) routingTable[i] = new int[] {id, id, 0};
-            else routingTable[i] = new int[] {-1, i, Integer.MAX_VALUE};
+            else routingTable[i] = new int[] {-1, i, 3000};
         }
 
         try {
@@ -49,7 +49,6 @@ public class PhysicalNode extends Node {
                     this.channel.queueDeclare(String.valueOf(id) + "-" + i, false, false, false, null);
                     this.channel.queueDeclare(i + "-" + String.valueOf(id), false, false, false, null);
                     real_neighbors++;
-                    System.out.println(id + " " + i);
                 }
             }
 
@@ -65,7 +64,6 @@ public class PhysicalNode extends Node {
     }
 
     public void start() {
-        System.out.println("Start " + id);
         //send a msg to the neighbors
         for (int i = 0; i < neighbors.length; i++)
             if (neighbors[i] != -1)
@@ -112,20 +110,17 @@ public class PhysicalNode extends Node {
             //update routing table
             neighbor_counter++;
             updateRoutingTable(message);
-            System.out.println(id + " updated " + neighbor_counter + " " + real_neighbors);
             if (neighbor_counter == real_neighbors) {
-                System.out.println("here");
+                System.out.println("\t" + id + " : my round_counter " + round_counter);
                 neighbor_counter = 0;
                 round_counter++;
-                if (round_counter < nodesNumber) {
+                if (round_counter <= nodesNumber) {
                     for (int i = 0; i < neighbors.length; i++) {
                         if (neighbors[i] != -1)
-                            sendMsg(new MessageObj(this.routingTable, this.id), this.neighbors[i]);
+                            sendMsg(new MessageObj(this.routingTable, this.id), i);
                     }
                 }
-                System.out.println(this.id + " all rounds are finished");
             }
-            System.out.println(id + " finished");
         };
         boolean autoAck = true; // acknowledgment is covered below
         try {
@@ -134,10 +129,8 @@ public class PhysicalNode extends Node {
                 if (neighbor != -1) {
                     channel.basicConsume(i + "-" + String.valueOf(id), autoAck, deliverCallback, consumerTag -> {
                     });
-                    System.out.println(id + " received " + i);
                 }
             }
-            System.out.println("after for");
         } catch (IOException e) {
             //todo: change?
             throw new RuntimeException(e);
@@ -157,9 +150,9 @@ public class PhysicalNode extends Node {
 
     private void updateRoutingTable(MessageObj message) {
         for (int i = 0; i < message.routingTable.length; i++) {
-            if (message.routingTable[i][2] <= this.routingTable[message.routingTable[i][1]][2]) {
+            if (message.routingTable[i][2] < this.routingTable[message.routingTable[i][1]][2]) {
                 //update the shortest path
-                this.routingTable[message.routingTable[i][1]][2] = message.routingTable[i][2];
+                this.routingTable[message.routingTable[i][1]][2] = message.routingTable[i][2] + 1;
                 //update the parent node
                 this.routingTable[message.routingTable[i][1]][0] = message.nodeId;
             }
