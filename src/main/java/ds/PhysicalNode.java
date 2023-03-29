@@ -37,8 +37,6 @@ public class PhysicalNode extends Node {
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost("localhost");
-            factory.useNio();
-            factory.setNioParams(new NioParams().setNbIoThreads(2));
             this.connection = factory.newConnection();
             this.channel = connection.createChannel();
 
