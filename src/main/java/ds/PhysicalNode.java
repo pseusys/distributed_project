@@ -9,11 +9,7 @@ import java.util.concurrent.TimeoutException;
 public class PhysicalNode extends Node {
     int nodesNumber;    //should be 5
 
-    int[] neighbors;
-
     int[][] routingTable;
-
-    private boolean started = false;
 
     private final Channel channel; //in
 
@@ -44,8 +40,8 @@ public class PhysicalNode extends Node {
             for (int i = 0; i < neighbors.length; i++) {
                 int neighbor = neighbors[i];
                 if (neighbor != -1) {
-                    this.channel.queueDeclare(String.valueOf(id) + "-" + i, false, false, false, null);
-                    this.channel.queueDeclare(i + "-" + String.valueOf(id), false, false, false, null);
+                    this.channel.queueDeclare(id + "-" + i, false, false, false, null);
+                    this.channel.queueDeclare(i + "-" + id, false, false, false, null);
                     real_neighbors++;
                 }
             }
@@ -73,7 +69,7 @@ public class PhysicalNode extends Node {
         byte[] byteMsg = getByteArray(msg);
 
         try {
-            channel.basicPublish("", String.valueOf(id) + "-" + neighbor,
+            channel.basicPublish("", id + "-" + neighbor,
                     MessageProperties.PERSISTENT_TEXT_PLAIN,
                     byteMsg);
             //System.out.println(this.id + " sent " + msg.getMsg());
@@ -125,7 +121,7 @@ public class PhysicalNode extends Node {
             for (int i = 0; i < neighbors.length; i++) {
                 int neighbor = neighbors[i];
                 if (neighbor != -1) {
-                    channel.basicConsume(i + "-" + String.valueOf(id), autoAck, deliverCallback, consumerTag -> {
+                    channel.basicConsume(i + "-" + id, autoAck, deliverCallback, consumerTag -> {
                     });
                 }
             }
