@@ -4,14 +4,25 @@ plugins {
 }
 
 group 'ds'
-version '1.0-SNAPSHOT'
+version VERSION
 
 repositories {
     mavenCentral()
 }
 
 application {
-    getMainClass().set(project.hasProperty("mainClass") ? project.getProperty("mainClass") : "NULL")
+    getMainClass().set(MAIN_CLASS)
+}
+
+jar {
+    archivesBaseName = BASE_NAME
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes 'Main-Class': MAIN_CLASS
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
 
 run {

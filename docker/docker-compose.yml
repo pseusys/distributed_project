@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ds-rabbitmq
+    restart: always
+    hostname: ds-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    configs:
+      - source: rabbitmq-config
+        target: /etc/rabbitmq/conf.d/20-user.conf
+    healthcheck:
+      test: rabbitmq-diagnostics -q check_running
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  distributed-project:
+    restart: "no"
+    image: distributed-project-latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        - MAIN_CLASS
+        - BASE_NAME
+        - VERSION
+        - WORK_DIR=ds-project
+    deploy:
+      mode: replicated
+      replicas: 5
+    environment:
+      - RABBIT_HOST=ds-rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+configs:
+  rabbitmq-config:
+    file: ../configs/rabbitmq.conf
+
+networks:
+  default-network:
+    driver: bridge

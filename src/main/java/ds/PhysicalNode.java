@@ -32,7 +32,7 @@ public class PhysicalNode extends Node {
 
         try {
             ConnectionFactory factory = new ConnectionFactory();
-            factory.setHost("localhost");
+            factory.setHost(System.getenv("RABBIT_HOST"));
             this.connection = factory.newConnection();
             this.channel = connection.createChannel();
 

@@ -1,0 +1,19 @@
+# IDE config directories
+.idea
+.vscode
+
+# Build system config and build directory
+.gradle
+build
+bin
+out
+
+# Source code for tests
+src/test
+
+# Settings and description files
+.gitignore
+gradlew
+gradlew.bat
+Makefile
+README.md
