@@ -29,7 +29,7 @@ public class Launcher {
         List<Node> physical = new ArrayList<>();
 
         for (int i = 0; i < 5; i++) {
-            physical.add(new Node(String.valueOf(i), 5, matrix[i]));
+            physical.add(new Node(i, 5, matrix[i]));
         }
 
         for (int i = 0; i < 5; i++) {

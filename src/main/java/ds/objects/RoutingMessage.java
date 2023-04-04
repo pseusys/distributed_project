@@ -9,7 +9,7 @@ import java.io.Serializable;
 
 
 public class RoutingMessage implements Serializable {
-    public String current;
+    public int current;
     public RoutingTable table;
 
     public static RoutingMessage parse(byte[] bytes) throws IOException, ClassNotFoundException {
@@ -22,7 +22,7 @@ public class RoutingMessage implements Serializable {
         }
     }
 
-    public RoutingMessage(RoutingTable table, String current) {
+    public RoutingMessage(RoutingTable table, int current) {
         this.current = current;
         this.table = table;
     }

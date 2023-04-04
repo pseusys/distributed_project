@@ -6,11 +6,10 @@ import ds.objects.RoutingMessage;
 import ds.objects.RoutingTable;
 
 import java.io.*;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 public class Node {
-    public String id;
+    public int id;
     int[] neighbors;
     int nodesNumber;    //should be 5
 
@@ -24,11 +23,11 @@ public class Node {
     private int neighbor_counter = 0;   //for each round
     private int real_neighbors = 0;
 
-    public Node(String id, int nodesNumber, int[] neighbors) {
+    public Node(int id, int nodesNumber, int[] neighbors) {
         this.id = id;
         this.nodesNumber = nodesNumber;
         this.neighbors = neighbors;
-        this.routingTable = new RoutingTable(id, List.of("0", "1", "2", "3", "4"));
+        this.routingTable = new RoutingTable(id, neighbors.length);
         System.out.println("Node '" + id + "' table: " + routingTable);
 
         try {
