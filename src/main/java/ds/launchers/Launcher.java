@@ -1,46 +1,47 @@
 package ds.launchers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import ds.Node;
 
-import static java.lang.Thread.sleep;
 
 public class Launcher {
+    private static int num = 5; 
+
     private static int[][] matrix = {
-            {-1, -1, 1, -1, -1},
-            {-1, -1, 1, 1, 1},
-            {1, 1, -1, -1, -1},
-            {-1, 1, -1, -1, -1},
-            {-1, 1, -1, -1, -1}
+        {-1, -1, 1, -1, -1},
+        {-1, -1, 1, 1, 1},
+        {1, 1, -1, -1, -1},
+        {-1, 1, -1, -1, -1},
+        {-1, 1, -1, -1, -1}
     };
 
-    private static Map<String, List<String>> mapping = Map.of(
-        "NODE_1", List.of("NODE_5", "NODE_2"),
-        "NODE_2", List.of("NODE_1", "NODE_3"),
-        "NODE_3", List.of("NODE_2", "NODE_4"),
-        "NODE_4", List.of("NODE_3", "NODE_5"),
-        "NODE_5", List.of("NODE_4", "NODE_1")
-    );
+    private static int[][] mapping = {
+        {-1, 1, -1, -1, 1},
+        {1, -1, 1, -1, -1},
+        {-1, 1, -1, 1, -1},
+        {-1, -1, 1, -1, 1},
+        {1, -1, -1, 1, -1}
+    };
 
     public static void main(String[] args) throws InterruptedException {
-        List<Node> physical = new ArrayList<>();
+        List<Node> nodes = new ArrayList<>();
 
-        for (int i = 0; i < 5; i++) {
-            physical.add(new Node(i, 5, matrix[i]));
-        }
+        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i]));
+        for (int i = 0; i < num; i++) nodes.get(i).start();
 
-        for (int i = 0; i < 5; i++) {
-            physical.get(i).start();
-        }
+        barrier(nodes);
 
-        sleep(5000);
+        int[][] distances = new int[num][num];
+        for (int i = 0; i < num; i++) distances[i] = nodes.get(i).distances();
+        for (int i = 0; i < num; i++) System.out.println(nodes.get(i));
+    }
 
-        for (int i = 0; i < 5; i++) {
-            System.out.println("i'm node " + physical.get(i).id);
-            System.out.println(physical.get(i).getRoutingTable());
-        }
+    static private void barrier(List<Node> nodes) {
+        boolean proceed = true;
+        while (proceed == false) for (Node node: nodes) proceed &= node.initialized();
     }
 }

@@ -7,7 +7,7 @@ import java.util.List;
 
 public class RoutingTable implements Serializable {
     public class RoutingTableEntry implements Serializable {
-        int gate, destination, distance;
+        public int gate, destination, distance;
 
         RoutingTableEntry(int id, boolean isCurrent) {
             if (isCurrent) {
