@@ -36,12 +36,18 @@ public class Launcher {
         barrier(nodes);
 
         int[][] distances = new int[num][num];
-        for (int i = 0; i < num; i++) distances[i] = nodes.get(i).distances();
+        for (int i = 0; i < num; i++) {
+            distances[i] = nodes.get(i).distances();
+            System.out.println(Arrays.toString(distances[i]));
+        }
         for (int i = 0; i < num; i++) System.out.println(nodes.get(i));
     }
 
     static private void barrier(List<Node> nodes) {
-        boolean proceed = true;
-        while (proceed == false) for (Node node: nodes) proceed &= node.initialized();
+        boolean proceed;
+        do {
+            proceed = true;
+            for (Node node: nodes) proceed &= node.initialized();
+        } while (proceed != true);
     }
 }

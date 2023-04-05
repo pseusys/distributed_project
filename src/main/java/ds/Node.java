@@ -63,10 +63,7 @@ public class Node {
 
     public int[] distances() {
         int[] dists = new int[neighbors.length];
-        System.out.println(routingTable);
-        for (int i = 0; i < neighbors.length; i++) {
-            dists[i] = routingTable.path(i).distance;
-        }
+        for (int i = 0; i < neighbors.length; i++) dists[i] = routingTable.path(i).distance;
         return dists;
     }
 
