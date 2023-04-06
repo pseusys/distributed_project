@@ -72,7 +72,7 @@ public class Node implements PhysicalNode, VirtualNode {
 
     @Override
     public String toString() {
-        return "Node " + physID + " connected: " + routingTable;
+        return "Node (physical: " + physID + ", virtual: " + virtID + ") with routing: " + routingTable;
     }
 
 
