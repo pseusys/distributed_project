@@ -22,7 +22,7 @@ import com.rabbitmq.client.Connection;
 
 public class Node implements PhysicalNode, VirtualNode {
     private int physID, virtID;
-    public final RoutingTable routingTable;
+    protected final RoutingTable routingTable;
 
     private final int[] connections;
     private final int[] neighbors;

@@ -1,11 +1,13 @@
 package ds.launchers;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import ds.misc.TripleConsumer;
 import ds.node.Node;
 import ds.node.NodeBuilder;
 import ds.objects.RoutingMessage;
+import ds.objects.RoutingTable;
 
 
 public class Launcher {
@@ -32,8 +34,8 @@ public class Launcher {
     // TODO: add DEATH on exceptions.
     public static void main(String[] args) throws InterruptedException {
         // TODO: accept routing table as well
-        Consumer<Node> creationCallback = (node) -> {
-            node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
+        BiConsumer<Node, RoutingTable> creationCallback = (node, table) -> {
+            node.broadcastMessagePhysical(new RoutingMessage(table, node.getPhysicalID()));
         };
 
         Consumer<Node> initializationCallback = (node) -> {

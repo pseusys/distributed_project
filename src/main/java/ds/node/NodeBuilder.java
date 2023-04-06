@@ -1,8 +1,10 @@
 package ds.node;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import ds.misc.TripleConsumer;
+import ds.objects.RoutingTable;
 
 
 public class NodeBuilder {
@@ -50,10 +52,10 @@ public class NodeBuilder {
         return this;
     }
 
-    public Node build(Consumer<Node> creationCallback) {
+    public Node build(BiConsumer<Node, RoutingTable> creationCallback) {
         if (computeVirtual == null) throw new RuntimeException("Virtual topology must be defined or computed!");
         Node node = new Node(physID, nodesNumber, neighbors, connections, virtualCallback, initializationCallback);
-        creationCallback.accept(node);
+        creationCallback.accept(node, node.routingTable);
         return node;
     }
 }
