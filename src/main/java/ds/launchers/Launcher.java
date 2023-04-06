@@ -29,6 +29,7 @@ public class Launcher {
     };
 
     // TODO: same superclass for all testing cases?
+    // TODO: add DEATH on exceptions.
     public static void main(String[] args) throws InterruptedException {
         // TODO: accept routing table as well
         Consumer<Node> creationCallback = (node) -> {
