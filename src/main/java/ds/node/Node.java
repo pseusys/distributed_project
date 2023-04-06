@@ -1,11 +1,10 @@
-package ds;
+package ds.node;
 
 import ds.base.BaseMessage;
 import ds.base.PhysicalNode;
 import ds.base.VirtualNode;
 import ds.misc.TripleConsumer;
 import ds.objects.DataMessage;
-import ds.objects.RoutingMessage;
 import ds.objects.RoutingTable;
 import ds.objects.ServiceMessage;
 
@@ -22,25 +21,20 @@ import com.rabbitmq.client.Connection;
 
 
 public class Node implements PhysicalNode, VirtualNode {
-    protected int physID, virtID;
-    protected RoutingTable routingTable;
+    private int physID, virtID;
+    public final RoutingTable routingTable;
 
-    protected int[] connections;
-    protected int[] neighbors;
-    protected String[] callbackIDs;
+    private final int[] connections;
+    private final int[] neighbors;
+    private final String[] callbackIDs;
 
-    protected final Connection connection;
-    protected final Channel channel;
+    private final Connection connection;
+    private final Channel channel;
 
-    protected int round_counter = 0;
-    protected int neighbor_counter = 0;
-    protected int real_neighbors = 0;
+    protected final TripleConsumer<String, Integer, Node> virtualCallback;
+    protected final Consumer<Node> initializationCallback;
 
-    DeliverCallback messageCallback;
-    TripleConsumer<String, Integer, Node> virtualCallback;
-    Consumer<Node> initializationCallback;
-
-    public Node(int id, int nodesNumber, int[] neighbors, int[] connections, TripleConsumer<String, Integer, Node> virtualCallback, Consumer<Node> initializationCallback) {
+    protected Node(int id, int nodesNumber, int[] neighbors, int[] connections, TripleConsumer<String, Integer, Node> virtualCallback, Consumer<Node> initializationCallback) {
         this.physID = this.virtID = id;
         this.neighbors = neighbors;
         this.connections = connections;
@@ -48,6 +42,7 @@ public class Node implements PhysicalNode, VirtualNode {
         this.initializationCallback = initializationCallback;
         this.virtualCallback = virtualCallback;
 
+        int real_neighbors = 0;
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost("localhost");
@@ -60,7 +55,19 @@ public class Node implements PhysicalNode, VirtualNode {
         }
 
         callbackIDs = new String[nodesNumber];
-        setupCallbacks(new NodeMessageCallback(this));
+        for (int i = 0; i < callbackIDs.length; i++) callbackIDs[i] = null;
+        DeliverCallback messageCallback = new NodeMessageCallback(this, neighbors, real_neighbors);
+
+        try {
+            for (int i = 0; i < neighbors.length; i++) {
+                if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
+                if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, messageCallback, consumerTag -> {});
+                else callbackIDs[i] = null;
+            }
+        } catch (IOException e) {
+            //TODO: do something else?
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -71,20 +78,7 @@ public class Node implements PhysicalNode, VirtualNode {
 
     // PHYSICAL UTILITIES:
 
-    private void setupCallbacks(DeliverCallback callback) {
-        try {
-            for (int i = 0; i < neighbors.length; i++) {
-                if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
-                if (neighbors[i] != -1 && callback != null) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, callback, consumerTag -> {});
-                else callbackIDs[i] = null;
-            }
-        } catch (IOException e) {
-            //TODO: do something else?
-            throw new RuntimeException(e);
-        }
-    }
-
-    public int createQueues() {
+    private int createQueues() {
         try {
             int neighbors_count = 0;
             for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
@@ -99,7 +93,7 @@ public class Node implements PhysicalNode, VirtualNode {
         }
     }
 
-    public void deleteQueues() {
+    private void deleteQueues() {
         try {
             for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
                 try {
@@ -127,7 +121,6 @@ public class Node implements PhysicalNode, VirtualNode {
         return "Physical node " + physID;
     }
 
-    // TODO: create auto-mapping option
     @Override
     public int[] physicalDistances() {
         int[] dists = new int[neighbors.length];
@@ -198,14 +191,5 @@ public class Node implements PhysicalNode, VirtualNode {
     @Override
     public void broadcastMessageVirtual(BaseMessage message) {
         for (int i = 0; i < connections.length; i++) if (connections[i] != -1) sendMessageVirtual(message, i);
-    }
-
-
-    // TODO: remove
-
-    public void start() {
-        //send a msg to the neighbors
-        for (int i = 0; i < neighbors.length; i++)
-            if (neighbors[i] != -1) sendMessagePhysical(new RoutingMessage(routingTable, physID), i);
     }
 }

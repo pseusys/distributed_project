@@ -1,4 +1,4 @@
-package ds;
+package ds.node;
 
 import java.io.IOException;
 
@@ -14,15 +14,19 @@ import ds.objects.ServiceMessage.MessageType;
 
 public class NodeMessageCallback implements DeliverCallback {
     private Node node;
-    // private int round_counter = 0;
-    // private int neighbor_counter = 0; //for each round
+    private int round_counter = 0;
+    private int neighbor_counter = 0;
+    private int real_neighbors = 0;
 
+    private int nodeNumber;
     private boolean[] initialized;
 
-    public NodeMessageCallback(Node node) {
+    protected NodeMessageCallback(Node node, int[] neighbors, int real_neighbors) {
         this.node = node;
-        this.initialized = new boolean[node.neighbors.length];
-        for (int i = 0; i < initialized.length; i++) initialized[i] = node.neighbors[i] == -1;
+        this.real_neighbors = real_neighbors;
+        this.nodeNumber = neighbors.length;
+        this.initialized = new boolean[nodeNumber];
+        for (int i = 0; i < nodeNumber; i++) initialized[i] = neighbors[i] == -1;
     }
 
     @Override
@@ -31,7 +35,7 @@ public class NodeMessageCallback implements DeliverCallback {
         try {
             message = BaseMessage.parse(delivery.getBody());
         } catch (ClassNotFoundException e) {
-            // TODO: change
+            // TODO: do something else?
             throw new RuntimeException(e);
         }
 
@@ -56,26 +60,26 @@ public class NodeMessageCallback implements DeliverCallback {
         
             case DataMessage.code:
                 DataMessage dm = (DataMessage) message;
-                if (dm.receiver == node.physID) {
+                if (dm.receiver == node.getPhysicalID()) {
                     if (node.virtualCallback != null) node.virtualCallback.apply(dm.message, dm.sender, node);
-                    else System.out.println("Physical node " + node.physID + " received a message, but it doesn't have a callback for it!");
+                    else System.out.println(node.physicalRepresentation() + " received a message, but it doesn't have a callback for it!");
                 } else {
-                    System.out.println("Physical node " + node.physID + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
+                    System.out.println(node.physicalRepresentation() + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
                     node.forwardMessageVirtual(message, dm.receiver);
                 }
                 break;
 
             case RoutingMessage.code:
                 RoutingMessage rm = (RoutingMessage) message;
-                node.neighbor_counter++;
+                neighbor_counter++;
                 node.routingTable.update(rm.table, rm.sender);
-                if (node.neighbor_counter == node.real_neighbors) {
-                    node.neighbor_counter = 0;
-                    node.round_counter++;
-                    if (node.round_counter == node.neighbors.length) {
-                        initialized[node.physID] = true;
-                        node.broadcastMessagePhysical(new ServiceMessage(node.physID, MessageType.INITIALIZED));
-                    } else if (node.round_counter <= node.neighbors.length) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.physID));
+                if (neighbor_counter == real_neighbors) {
+                    neighbor_counter = 0;
+                    round_counter++;
+                    if (round_counter == nodeNumber) {
+                        initialized[node.getPhysicalID()] = true;
+                        node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
+                    } else if (round_counter <= nodeNumber) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
                 }
                 break;
 

@@ -1,10 +1,11 @@
 package ds.launchers;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.function.Consumer;
 
-import ds.Node;
 import ds.misc.TripleConsumer;
+import ds.node.Node;
+import ds.node.NodeBuilder;
+import ds.objects.RoutingMessage;
 
 
 public class Launcher {
@@ -29,10 +30,18 @@ public class Launcher {
 
     // TODO: same superclass for all testing cases?
     public static void main(String[] args) throws InterruptedException {
-        List<Node> nodes = new ArrayList<>();
-        
+        // TODO: accept routing table as well
+        Consumer<Node> creationCallback = (node) -> {
+            node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
+        };
+
+        Consumer<Node> initializationCallback = (node) -> {
+            System.out.println(node);
+            if (node.getPhysicalID() == 0) node.sendTextVirtual("Forwarding 0", 1);
+        };
+
         // If process 0, print message, otherwise forward to the next in the ring.
-        TripleConsumer<String, Integer, Node> callback = (message, sender, self) -> {
+        TripleConsumer<String, Integer, Node> messageCallback = (message, sender, self) -> {
             if (self.getVirtualID() == 0) {
                 System.out.println("Virtual node 0 passed the message '" + message + " -> 0' round the ring!");
                 self.die(null);
@@ -43,11 +52,12 @@ public class Launcher {
                 self.sendTextVirtual(newMessage, newRecipient);
             }
         };
-        
-        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i], mapping[i], callback, (node) -> {
-            System.out.println(node);
-            if (node.getPhysicalID() == 0) node.sendTextVirtual("Forwarding 0", 1);
-        }));
-        for (int i = 0; i < num; i++) nodes.get(i).start();
+
+        for (int i = 0; i < num; i++)
+            NodeBuilder.create(i, matrix[i])
+                .defineVirtual(i, mapping[i])
+                .afterInitialization(initializationCallback)
+                .onVirtualMessage(messageCallback)
+                .build(creationCallback);
     }
 }
