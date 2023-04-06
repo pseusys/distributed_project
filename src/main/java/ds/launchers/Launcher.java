@@ -5,7 +5,6 @@ import java.util.List;
 
 import ds.Node;
 import ds.misc.TripleConsumer;
-import ds.objects.DataMessage;
 
 
 public class Launcher {
@@ -36,6 +35,7 @@ public class Launcher {
         for (int i = 0; i < num; i++) nodes.get(i).start();
 
         // TODO: centralized solution, doesn't fit for a distributed system.
+        // TODO: exception if virtual node methods are called on node before algorithm finishes.
         barrier(nodes);
 
         int[][] distances = new int[num][num];
@@ -47,16 +47,16 @@ public class Launcher {
         
         // If process 0, print message, otherwise forward to the next in the ring.
         TripleConsumer<String, Integer, Node> callback = (message, sender, self) -> {
-            if (self.id == 0) {
+            if (self.getVirtualID() == 0) {
                 System.out.println("Virtual node 0 passed the message '" + message + " -> 0' round the ring!");
             } else {
-                String newMessage = message + " -> " + self.id;
-                int newRecipient = self.id == num - 1 ? 0 : self.id + 1;
-                System.out.println("Virtual node " + self.id + " passes message '" + newMessage + "' to node " + newRecipient + "!");
+                String newMessage = message + " -> " + self.getVirtualID();
+                int newRecipient = self.getVirtualID() == num - 1 ? 0 : self.getVirtualID() + 1;
+                System.out.println("Virtual node " + self.getVirtualID() + " passes message '" + newMessage + "' to node " + newRecipient + "!");
                 self.sendText(newRecipient, newMessage);
             }
         };
-        for (int i = 0; i < num; i++) nodes.get(i).map(mapping[i], callback);
+        for (int i = 0; i < num; i++) nodes.get(i).map(i, mapping[i], callback);
         nodes.get(0).sendText(1, "Forwarding 0");
     }
 

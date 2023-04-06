@@ -16,7 +16,7 @@ import com.rabbitmq.client.Connection;
 
 
 public class Node {
-    public int id;
+    private int physID, virtID;
     private int[] connections;
     private int[] neighbors;
 
@@ -28,10 +28,10 @@ public class Node {
     private int neighbor_counter = 0; //for each round
     private int real_neighbors = 0;
 
-    private String[] callbackID;
+    private String[] callbackIDs;
 
     public Node(int id, int nodesNumber, int[] neighbors) {
-        this.id = id;
+        this.physID = id;
         this.neighbors = neighbors;
         this.routingTable = new RoutingTable(id, neighbors.length);
 
@@ -48,17 +48,26 @@ public class Node {
                 real_neighbors++;
             }
 
-            callbackID = new String[nodesNumber];
+            callbackIDs = new String[nodesNumber];
             processMsg();
         } catch (IOException | TimeoutException e) {
             throw new RuntimeException(e);
         }
     }
 
+    public int getPhysicalID() {
+        return physID;
+    }
+
+    public int getVirtualID() {
+        if (!initialized()) throw new RuntimeException("Virtual ID should be invoked only after node initialization!");
+        return virtID;
+    }
+
     public void start() {
         //send a msg to the neighbors
         for (int i = 0; i < neighbors.length; i++)
-            if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, id), i);
+            if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, physID), i);
     }
 
     public boolean initialized() {
@@ -71,8 +80,9 @@ public class Node {
         return dists;
     }
 
-    public void map(int[] connections, TripleConsumer<String, Integer, Node> callback) {
+    public void map(int id, int[] connections, TripleConsumer<String, Integer, Node> callback) {
         if (!initialized()) throw new RuntimeException("Map should be invoked only after node initialization!");
+        this.virtID = id;
         this.connections = connections;
 
         DeliverCallback deliverCallback = (consumerTag, delivery) -> {
@@ -83,11 +93,11 @@ public class Node {
                 throw new RuntimeException(e);
             }
     
-            if (message.receiver == id) {
+            if (message.receiver == physID) {
                 if (callback != null) callback.apply(message.message, message.sender, this);
-                else System.out.println("Physical node " + id + " received a message, but it doesn't have a callback for it!");
+                else System.out.println("Physical node " + physID + " received a message, but it doesn't have a callback for it!");
             } else {
-                System.out.println("Physical node " + id + " forwards a message (from " + message.sender + ", to: " + message.receiver + ")!");
+                System.out.println("Physical node " + physID + " forwards a message (from " + message.sender + ", to: " + message.receiver + ")!");
                 forwardText(message.sender, message.receiver, message.message);
             }
         };
@@ -96,15 +106,15 @@ public class Node {
 
     public void sendText(int recipient, String message) {
         if (!initialized()) throw new RuntimeException("Send text should be invoked only after node initialization!");
-        if (connections[recipient] != -1) forwardText(id, recipient, message);
-        else System.out.println("Node " + id + " can't pass a message to node " + recipient + ": they aren't connected!");
+        if (connections[recipient] != -1) forwardText(physID, recipient, message);
+        else System.out.println("Virtual node " + virtID + " can't pass a message to node " + recipient + ": they aren't connected!");
     }
 
     private void forwardText(int sender, int recipient, String message) {
         try {
             int gate = routingTable.path(recipient).gate;
             byte[] byteMsg = (new DataMessage(message, sender, recipient)).dump();
-            channel.basicPublish("", id + "-" + gate, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
+            channel.basicPublish("", physID + "-" + gate, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -113,7 +123,7 @@ public class Node {
     private void sendMsg(RoutingMessage msg, int neighbor) {
         try {
             byte[] byteMsg = msg.dump();
-            channel.basicPublish("", id + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
+            channel.basicPublish("", physID + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -138,7 +148,7 @@ public class Node {
                 round_counter++;
                 if (round_counter < neighbors.length)
                     for (int i = 0; i < neighbors.length; i++)
-                        if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, id), i);
+                        if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, physID), i);
             }
         };
         setupCallbacks(deliverCallback);
@@ -147,9 +157,9 @@ public class Node {
     private void setupCallbacks(DeliverCallback callback) {
         try {
             for (int i = 0; i < neighbors.length; i++) {
-                if (callbackID[i] != null) channel.basicCancel(callbackID[i]);
-                if (neighbors[i] != -1) callbackID[i] = channel.basicConsume(i + "-" + id, true, callback, consumerTag -> {});
-                else callbackID[i] = null;
+                if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
+                if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, callback, consumerTag -> {});
+                else callbackIDs[i] = null;
             }
         } catch (IOException e) {
             //TODO: change?
@@ -159,6 +169,6 @@ public class Node {
 
     @Override
     public String toString() {
-        return "Node " + id + " connected: " + routingTable;
+        return "Node " + physID + " connected: " + routingTable;
     }
 }
