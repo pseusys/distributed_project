@@ -103,6 +103,7 @@ public abstract class ConsoleApp {
                 System.err.println("!!! " + cpe.getMessage());
             }
         }
+        scanner.close();
     }
 
     private void printCommandHelp() {
