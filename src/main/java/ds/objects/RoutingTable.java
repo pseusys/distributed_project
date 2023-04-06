@@ -2,22 +2,16 @@ package ds.objects;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.List;
 
 
 public class RoutingTable implements Serializable {
     public class RoutingTableEntry implements Serializable {
-        public int gate, destination, distance;
+        public final int gate, destination, distance;
 
-        RoutingTableEntry(int id, boolean isCurrent) {
-            if (isCurrent) {
-                gate = destination = id;
-                distance = 0;
-            } else {
-                gate = -1;
-                destination = id;
-                distance = 3000; // TODO: change to "undefined" value.
-            }
+        protected RoutingTableEntry(int gate, int destination, int distance) {
+            this.gate = gate;
+            this.destination = destination;
+            this.distance = distance;
         }
 
         @Override
@@ -26,10 +20,21 @@ public class RoutingTable implements Serializable {
         }
     }
 
-    private List<RoutingTableEntry> table = new ArrayList<RoutingTableEntry>();
+    private final ArrayList<RoutingTableEntry> table = new ArrayList<RoutingTableEntry>();
 
     public RoutingTable(int current, int neighbors) {
-        for (int i = 0; i < neighbors; i++) table.add(new RoutingTableEntry(i, i == current));
+        for (int i = 0; i < neighbors; i++) {
+            int gate, destination, distance;
+            if (i == current) {
+                gate = destination = current;
+                distance = 0;
+            } else {
+                gate = -1;
+                destination = i;
+                distance = 3000; // TODO: change to "undefined" value.
+            }
+            table.add(new RoutingTableEntry(gate, destination, distance));
+        }
     }
 
     public RoutingTableEntry path(int node) {
@@ -39,13 +44,14 @@ public class RoutingTable implements Serializable {
 
     public void update(RoutingTable another, int sender) {
         for (RoutingTableEntry entry: another.table) {
-            RoutingTableEntry current = path(entry.destination);
-            if (entry.distance < current.distance) {
-                //update the shortest path
-                current.distance = entry.distance + 1;
-                //update the parent node
-                current.gate = sender;
+            int pathIndex = -1;
+            for (int i = 0; i < table.size(); i++) if (table.get(i).destination == entry.destination) {
+                pathIndex = i;
+                break;
             }
+            if (pathIndex == -1) throw new RuntimeException("Route to node " + entry + " is not defined!");
+            RoutingTableEntry path = table.get(pathIndex);
+            if (entry.distance < path.distance) table.set(pathIndex, new RoutingTableEntry(sender, path.destination, entry.distance + 1));
         }
     }
 

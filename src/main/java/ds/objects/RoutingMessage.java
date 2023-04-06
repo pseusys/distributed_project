@@ -1,41 +1,21 @@
 package ds.objects;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
+import ds.base.BaseMessage;
 
 
-// TODO: extend a message interface
-public class RoutingMessage implements Serializable {
-    public int current;
-    public RoutingTable table;
+public class RoutingMessage extends BaseMessage {
+    public static final byte code = 0x01;
 
-    public static RoutingMessage parse(byte[] bytes) throws IOException, ClassNotFoundException {
-        try {
-            ByteArrayInputStream byteStream = new ByteArrayInputStream(bytes);
-            ObjectInputStream objectStream = new ObjectInputStream(byteStream);
-            return (RoutingMessage) objectStream.readObject();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    public final int sender;
+    public final RoutingTable table;
 
-    public RoutingMessage(RoutingTable table, int current) {
-        this.current = current;
+    public RoutingMessage(RoutingTable table, int sender) {
+        this.sender = sender;
         this.table = table;
     }
 
-    public byte[] dump() {
-        try {
-            ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-            ObjectOutputStream objectStream = new ObjectOutputStream(byteStream);
-            objectStream.writeObject(this);
-            return byteStream.toByteArray();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    @Override
+    public byte getMessageTypeCode() {
+        return code;
     }
 }

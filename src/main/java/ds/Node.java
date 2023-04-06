@@ -17,19 +17,22 @@ import com.rabbitmq.client.Connection;
 
 // TODO: extend a virtual node interface and physical node interface
 public class Node {
-    private int physID, virtID;
-    private int[] connections;
-    private int[] neighbors;
+    protected int physID, virtID;
+    protected int[] connections;
+    protected int[] neighbors;
 
-    private RoutingTable routingTable;
+    protected RoutingTable routingTable;
 
-    private final Channel channel; //in
+    protected final Channel channel; //in
 
-    private int round_counter = 0;
-    private int neighbor_counter = 0; //for each round
-    private int real_neighbors = 0;
+    protected int round_counter = 0;
+    protected int neighbor_counter = 0; //for each round
+    protected int real_neighbors = 0;
 
-    private String[] callbackIDs;
+    TripleConsumer<String, Integer, Node> virtualCallback;
+    protected String[] callbackIDs;
+
+    DeliverCallback messageCallback;
 
     public Node(int id, int nodesNumber, int[] neighbors) {
         this.physID = id;
@@ -50,7 +53,7 @@ public class Node {
             }
 
             callbackIDs = new String[nodesNumber];
-            processMsg();
+            setupCallbacks(new NodeMessageCallback(this));
         } catch (IOException | TimeoutException e) {
             throw new RuntimeException(e);
         }
@@ -85,24 +88,7 @@ public class Node {
         if (!initialized()) throw new RuntimeException("Map should be invoked only after node initialization!");
         this.virtID = id;
         this.connections = connections;
-
-        DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-            DataMessage message;
-            try {
-                message = DataMessage.parse(delivery.getBody());
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-    
-            if (message.receiver == physID) {
-                if (callback != null) callback.apply(message.message, message.sender, this);
-                else System.out.println("Physical node " + physID + " received a message, but it doesn't have a callback for it!");
-            } else {
-                System.out.println("Physical node " + physID + " forwards a message (from " + message.sender + ", to: " + message.receiver + ")!");
-                forwardText(message.sender, message.receiver, message.message);
-            }
-        };
-        setupCallbacks(deliverCallback);
+        this.virtualCallback = callback;
     }
 
     public void sendText(int recipient, String message) {
@@ -111,7 +97,7 @@ public class Node {
         else System.out.println("Virtual node " + virtID + " can't pass a message to node " + recipient + ": they aren't connected!");
     }
 
-    private void forwardText(int sender, int recipient, String message) {
+    protected void forwardText(int sender, int recipient, String message) {
         try {
             int gate = routingTable.path(recipient).gate;
             byte[] byteMsg = (new DataMessage(message, sender, recipient)).dump();
@@ -121,7 +107,7 @@ public class Node {
         }
     }
 
-    private void sendMsg(RoutingMessage msg, int neighbor) {
+    protected void sendMsg(RoutingMessage msg, int neighbor) {
         try {
             byte[] byteMsg = msg.dump();
             channel.basicPublish("", physID + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
@@ -130,32 +116,7 @@ public class Node {
         }
     }
 
-    private void processMsg() {
-        DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-            RoutingMessage message;
-            try {
-                message = RoutingMessage.parse(delivery.getBody());
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-    
-            //receiveMsg
-            //update routing table
-            neighbor_counter++;
-            routingTable.update(message.table, message.current);
-    
-            if (neighbor_counter == real_neighbors) {
-                neighbor_counter = 0;
-                round_counter++;
-                if (round_counter < neighbors.length)
-                    for (int i = 0; i < neighbors.length; i++)
-                        if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, physID), i);
-            }
-        };
-        setupCallbacks(deliverCallback);
-    }
-
-    private void setupCallbacks(DeliverCallback callback) {
+    protected void setupCallbacks(DeliverCallback callback) {
         try {
             for (int i = 0; i < neighbors.length; i++) {
                 if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
