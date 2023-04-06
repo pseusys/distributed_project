@@ -15,6 +15,7 @@ import com.rabbitmq.client.MessageProperties;
 import com.rabbitmq.client.Connection;
 
 
+// TODO: extend a virtual node interface and physical node interface
 public class Node {
     private int physID, virtID;
     private int[] connections;

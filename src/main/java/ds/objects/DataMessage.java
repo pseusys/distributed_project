@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 
+// TODO: extend a message interface
 public class DataMessage implements Serializable {
     public int sender, receiver;
     public String message;

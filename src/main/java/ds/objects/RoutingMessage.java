@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
 
+// TODO: extend a message interface
 public class RoutingMessage implements Serializable {
     public int current;
     public RoutingTable table;
