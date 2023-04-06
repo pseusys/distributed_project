@@ -38,7 +38,7 @@ public class Node implements PhysicalNode, VirtualNode {
         this.physID = this.virtID = id;
         this.neighbors = neighbors;
         this.connections = connections;
-        this.routingTable = new RoutingTable(id, neighbors.length);
+        this.routingTable = new RoutingTable(id, nodesCount());
         this.initializationCallback = initializationCallback;
         this.virtualCallback = virtualCallback;
 
@@ -55,11 +55,11 @@ public class Node implements PhysicalNode, VirtualNode {
         }
 
         callbackIDs = new String[nodesNumber];
-        for (int i = 0; i < callbackIDs.length; i++) callbackIDs[i] = null;
+        for (int i = 0; i < nodesCount(); i++) callbackIDs[i] = null;
         DeliverCallback messageCallback = new NodeMessageCallback(this, neighbors, real_neighbors);
 
         try {
-            for (int i = 0; i < neighbors.length; i++) {
+            for (int i = 0; i < nodesCount(); i++) {
                 if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
                 if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, messageCallback, consumerTag -> {});
                 else callbackIDs[i] = null;
@@ -68,6 +68,10 @@ public class Node implements PhysicalNode, VirtualNode {
             //TODO: do something else?
             throw new RuntimeException(e);
         }
+    }
+
+    public int nodesCount() {
+        return neighbors.length;
     }
 
     @Override
@@ -81,7 +85,7 @@ public class Node implements PhysicalNode, VirtualNode {
     private int createQueues() {
         try {
             int neighbors_count = 0;
-            for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
+            for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
                 channel.queueDeclare(physID + "-" + i, false, false, false, null);
                 channel.queueDeclare(i + "-" + physID, false, false, false, null);
                 neighbors_count++;
@@ -95,7 +99,7 @@ public class Node implements PhysicalNode, VirtualNode {
 
     private void deleteQueues() {
         try {
-            for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
+            for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
                 try {
                     channel.queueDelete(physID + "-" + i);
                 } catch (AlreadyClosedException e) {
@@ -123,8 +127,8 @@ public class Node implements PhysicalNode, VirtualNode {
 
     @Override
     public int[] physicalDistances() {
-        int[] dists = new int[neighbors.length];
-        for (int i = 0; i < neighbors.length; i++) dists[i] = routingTable.path(i).distance;
+        int[] dists = new int[nodesCount()];
+        for (int i = 0; i < nodesCount(); i++) dists[i] = routingTable.path(i).distance;
         return dists;
     }
 
@@ -141,7 +145,7 @@ public class Node implements PhysicalNode, VirtualNode {
 
     @Override
     public void broadcastMessagePhysical(BaseMessage message) {
-        for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) sendMessagePhysical(message, i);
+        for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) sendMessagePhysical(message, i);
     }
 
     @Override
@@ -190,6 +194,6 @@ public class Node implements PhysicalNode, VirtualNode {
 
     @Override
     public void broadcastMessageVirtual(BaseMessage message) {
-        for (int i = 0; i < connections.length; i++) if (connections[i] != -1) sendMessageVirtual(message, i);
+        for (int i = 0; i < nodesCount(); i++) if (connections[i] != -1) sendMessageVirtual(message, i);
     }
 }

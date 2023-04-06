@@ -24,7 +24,7 @@ public class NodeMessageCallback implements DeliverCallback {
     protected NodeMessageCallback(Node node, int[] neighbors, int real_neighbors) {
         this.node = node;
         this.real_neighbors = real_neighbors;
-        this.nodeNumber = neighbors.length;
+        this.nodeNumber = node.nodesCount();
         this.initialized = new boolean[nodeNumber];
         for (int i = 0; i < nodeNumber; i++) initialized[i] = neighbors[i] == -1;
     }
@@ -91,7 +91,7 @@ public class NodeMessageCallback implements DeliverCallback {
 
     private boolean checkInitialized() {
         boolean init = true;
-        for (int i = 0; i < initialized.length; i++) init &= initialized[i];
+        for (int i = 0; i < nodeNumber; i++) init &= initialized[i];
         return init;
     }
 }

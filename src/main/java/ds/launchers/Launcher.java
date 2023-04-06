@@ -50,7 +50,7 @@ public class Launcher {
                 self.die(null);
             } else {
                 String newMessage = message + " -> " + self.getVirtualID();
-                int newRecipient = self.getVirtualID() == num - 1 ? 0 : self.getVirtualID() + 1;
+                int newRecipient = self.getVirtualID() == self.nodesCount() - 1 ? 0 : self.getVirtualID() + 1;
                 System.out.println(self.virtualRepresentation() + " passes message '" + newMessage + "' to node " + newRecipient + "!");
                 self.sendTextVirtual(newMessage, newRecipient);
             }
