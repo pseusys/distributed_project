@@ -40,14 +40,13 @@ public class Launcher {
                 String newMessage = message + " -> " + self.getVirtualID();
                 int newRecipient = self.getVirtualID() == num - 1 ? 0 : self.getVirtualID() + 1;
                 System.out.println("Virtual node " + self.getVirtualID() + " passes message '" + newMessage + "' to node " + newRecipient + "!");
-                self.sendText(newRecipient, newMessage);
+                self.sendTextVirtual(newMessage, newRecipient);
             }
         };
         
-        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i], (node) -> {
+        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i], mapping[i], callback, (node) -> {
             System.out.println(node);
-            node.map(node.getPhysicalID(), mapping[node.getPhysicalID()], callback);
-            if (node.getPhysicalID() == 0) node.sendText(1, "Forwarding 0");
+            if (node.getPhysicalID() == 0) node.sendTextVirtual("Forwarding 0", 1);
         }));
         for (int i = 0; i < num; i++) nodes.get(i).start();
     }

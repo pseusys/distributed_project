@@ -61,7 +61,7 @@ public class NodeMessageCallback implements DeliverCallback {
                     else System.out.println("Physical node " + node.physID + " received a message, but it doesn't have a callback for it!");
                 } else {
                     System.out.println("Physical node " + node.physID + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
-                    node.forwardText(dm.sender, dm.receiver, dm.message);
+                    node.forwardMessageVirtual(message, dm.receiver);
                 }
                 break;
 
@@ -72,13 +72,10 @@ public class NodeMessageCallback implements DeliverCallback {
                 if (node.neighbor_counter == node.real_neighbors) {
                     node.neighbor_counter = 0;
                     node.round_counter++;
-                    if (node.round_counter == node.neighbors.length) initialized[node.physID] = true;
-                    if (node.round_counter <= node.neighbors.length)
-                        for (int i = 0; i < node.neighbors.length; i++)
-                            if (node.neighbors[i] != -1) {
-                                if (node.round_counter < node.neighbors.length) node.sendMsg(new RoutingMessage(node.routingTable, node.physID), i);
-                                else node.sendMsg(new ServiceMessage(node.physID, MessageType.INITIALIZED), i);
-                            }
+                    if (node.round_counter == node.neighbors.length) {
+                        initialized[node.physID] = true;
+                        node.broadcastMessagePhysical(new ServiceMessage(node.physID, MessageType.INITIALIZED));
+                    } else if (node.round_counter <= node.neighbors.length) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.physID));
                 }
                 break;
 

@@ -1,6 +1,8 @@
 package ds;
 
 import ds.base.BaseMessage;
+import ds.base.PhysicalNode;
+import ds.base.VirtualNode;
 import ds.misc.TripleConsumer;
 import ds.objects.DataMessage;
 import ds.objects.RoutingMessage;
@@ -19,8 +21,7 @@ import com.rabbitmq.client.MessageProperties;
 import com.rabbitmq.client.Connection;
 
 
-// TODO: extend a virtual node interface and physical node interface
-public class Node {
+public class Node implements PhysicalNode, VirtualNode {
     protected int physID, virtID;
     protected RoutingTable routingTable;
 
@@ -29,98 +30,48 @@ public class Node {
     protected String[] callbackIDs;
 
     protected final Connection connection;
-    protected final Channel channel; //in
+    protected final Channel channel;
 
     protected int round_counter = 0;
-    protected int neighbor_counter = 0; //for each round
+    protected int neighbor_counter = 0;
     protected int real_neighbors = 0;
 
     DeliverCallback messageCallback;
     TripleConsumer<String, Integer, Node> virtualCallback;
     Consumer<Node> initializationCallback;
 
-    public Node(int id, int nodesNumber, int[] neighbors, Consumer<Node> initializationCallback) {
-        this.physID = id;
+    public Node(int id, int nodesNumber, int[] neighbors, int[] connections, TripleConsumer<String, Integer, Node> virtualCallback, Consumer<Node> initializationCallback) {
+        this.physID = this.virtID = id;
         this.neighbors = neighbors;
+        this.connections = connections;
         this.routingTable = new RoutingTable(id, neighbors.length);
         this.initializationCallback = initializationCallback;
+        this.virtualCallback = virtualCallback;
 
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost("localhost");
             this.connection = factory.newConnection();
             this.channel = connection.createChannel();
-
-            // we create a queue for every neighbor with name this.id + neighbor.id
-            for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
-                this.channel.queueDeclare(id + "-" + i, false, false, false, null);
-                this.channel.queueDeclare(i + "-" + id, false, false, false, null);
-                real_neighbors++;
-            }
-
-            callbackIDs = new String[nodesNumber];
-            setupCallbacks(new NodeMessageCallback(this));
+            real_neighbors = createQueues();
         } catch (IOException | TimeoutException e) {
+            // TODO: do something else?
             throw new RuntimeException(e);
         }
+
+        callbackIDs = new String[nodesNumber];
+        setupCallbacks(new NodeMessageCallback(this));
     }
 
-    // TODO: add representation methods.
-    public int getPhysicalID() {
-        return physID;
+    @Override
+    public String toString() {
+        return "Node " + physID + " connected: " + routingTable;
     }
 
-    // TODO: add representation methods.
-    public int getVirtualID() {
-        return virtID;
-    }
 
-    public void start() {
-        //send a msg to the neighbors
-        for (int i = 0; i < neighbors.length; i++)
-            if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, physID), i);
-    }
+    // PHYSICAL UTILITIES:
 
-    public int[] distances() {
-        int[] dists = new int[neighbors.length];
-        for (int i = 0; i < neighbors.length; i++) dists[i] = routingTable.path(i).distance;
-        return dists;
-    }
-
-    public void map(int id, int[] connections, TripleConsumer<String, Integer, Node> callback) {
-        this.virtID = id;
-        this.connections = connections;
-        this.virtualCallback = callback;
-    }
-
-    // TODO: add broadcast
-    public void sendText(int recipient, String message) {
-        if (connections[recipient] != -1) forwardText(physID, recipient, message);
-        else System.out.println("Virtual node " + virtID + " can't pass a message to node " + recipient + ": they aren't connected!");
-    }
-
-    // TODO: add broadcast
-    protected void forwardText(int sender, int recipient, String message) {
-        try {
-            int gate = routingTable.path(recipient).gate;
-            byte[] byteMsg = (new DataMessage(message, sender, recipient)).dump();
-            channel.basicPublish("", physID + "-" + gate, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    // TODO: add broadcast
-    protected void sendMsg(BaseMessage msg, int neighbor) {
-        try {
-            byte[] byteMsg = msg.dump();
-            channel.basicPublish("", physID + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    protected void setupCallbacks(DeliverCallback callback) {
+    private void setupCallbacks(DeliverCallback callback) {
         try {
             for (int i = 0; i < neighbors.length; i++) {
                 if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
@@ -128,27 +79,85 @@ public class Node {
                 else callbackIDs[i] = null;
             }
         } catch (IOException e) {
-            //TODO: change?
+            //TODO: do something else?
             throw new RuntimeException(e);
         }
     }
 
-    public void die(Integer cause) {
-        if (!connection.isOpen()) return;
-        if (cause != null) System.out.println("Physical node " + physID + " died because of node " + cause + "!");
-        else System.out.println("Physical node " + physID + " said 'uhhh' and just died!");
-        for (int i = 0; i < neighbors.length; i++)
-            if (neighbors[i] != -1) {
+    public int createQueues() {
+        try {
+            int neighbors_count = 0;
+            for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
+                this.channel.queueDeclare(physID + "-" + i, false, false, false, null);
+                this.channel.queueDeclare(i + "-" + physID, false, false, false, null);
+                neighbors_count++;
+            }
+            return neighbors_count;
+        } catch (IOException e) {
+            // TODO: do something else? Maybe tighten the clause?
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void deleteQueues() {
+        try {
+            for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
                 try {
-                    sendMsg(new ServiceMessage(physID, ServiceMessage.MessageType.CASCADE_DEATH), i);
                     this.channel.queueDelete(physID + "-" + i);
-                } catch (IOException e) {
-                    // TODO: do something else?
-                    e.printStackTrace();
                 } catch (AlreadyClosedException e) {
                     // Do nothing, queue already deleted.
                 }
             }
+        } catch (IOException e) {
+            // TODO: do something else? Maybe tighten the clause?
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    // PHYSICAL NODE:
+
+    @Override
+    public int getPhysicalID() {
+        return physID;
+    }
+
+    @Override
+    public String physicalRepresentation() {
+        return "Physical node " + physID;
+    }
+
+    // TODO: create auto-mapping option
+    @Override
+    public int[] physicalDistances() {
+        int[] dists = new int[neighbors.length];
+        for (int i = 0; i < neighbors.length; i++) dists[i] = routingTable.path(i).distance;
+        return dists;
+    }
+
+    @Override
+    public void sendMessagePhysical(BaseMessage message, int neighbor) {
+        try {
+            byte[] byteMsg = message.dump();
+            channel.basicPublish("", physID + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
+        } catch (IOException e) {
+            // TODO: do something else?
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void broadcastMessagePhysical(BaseMessage message) {
+        for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) sendMessagePhysical(message, i);
+    }
+
+    @Override
+    public void die(Integer cause) {
+        if (!connection.isOpen()) return;
+        if (cause != null) System.out.println("Physical node " + physID + " died because of node " + cause + "!");
+        else System.out.println("Physical node " + physID + " said 'uhhh' and just died!");
+        broadcastMessagePhysical(new ServiceMessage(physID, ServiceMessage.MessageType.CASCADE_DEATH));
+        deleteQueues();
         try {
             connection.abort();
         } catch (AlreadyClosedException e) {
@@ -156,8 +165,47 @@ public class Node {
         }
     }
 
+
+    // VIRTUAL NODE:
+
     @Override
-    public String toString() {
-        return "Node " + physID + " connected: " + routingTable;
+    public int getVirtualID() {
+        return virtID;
+    }
+
+    @Override
+    public String virtualRepresentation() {
+        return "Virtual node " + virtID;
+    }
+
+    @Override
+    public void sendTextVirtual(String message, int recipient) {
+        sendMessageVirtual(new DataMessage(message, virtID, recipient), recipient);
+    }
+
+    @Override
+    public void sendMessageVirtual(BaseMessage message, int recipient) {
+        if (connections[recipient] != -1) forwardMessageVirtual(message, recipient);
+        else System.out.println("Virtual node " + virtID + " can't pass a message to node " + recipient + ": they aren't connected!");
+    }
+
+    @Override
+    public void forwardMessageVirtual(BaseMessage message, int recipient) {
+        int gate = routingTable.path(recipient).gate;
+        sendMessagePhysical(message, gate);
+    }
+
+    @Override
+    public void broadcastMessageVirtual(BaseMessage message) {
+        for (int i = 0; i < connections.length; i++) if (connections[i] != -1) sendMessageVirtual(message, i);
+    }
+
+
+    // TODO: remove
+
+    public void start() {
+        //send a msg to the neighbors
+        for (int i = 0; i < neighbors.length; i++)
+            if (neighbors[i] != -1) sendMessagePhysical(new RoutingMessage(routingTable, physID), i);
     }
 }
