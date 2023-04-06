@@ -17,8 +17,12 @@ public class NodeMessageCallback implements DeliverCallback {
     // private int round_counter = 0;
     // private int neighbor_counter = 0; //for each round
 
+    private boolean[] initialized;
+
     public NodeMessageCallback(Node node) {
         this.node = node;
+        this.initialized = new boolean[node.neighbors.length];
+        for (int i = 0; i < initialized.length; i++) initialized[i] = node.neighbors[i] == -1;
     }
 
     @Override
@@ -36,7 +40,8 @@ public class NodeMessageCallback implements DeliverCallback {
                 ServiceMessage sm = (ServiceMessage) message;
                 switch (sm.type) {
                     case INITIALIZED:
-                        node.initializationCallback.accept(node);
+                        initialized[sm.sender] = true;
+                        if (checkInitialized()) node.initializationCallback.accept(node);
                         break;
                     
                     case CASCADE_DEATH:
@@ -67,9 +72,13 @@ public class NodeMessageCallback implements DeliverCallback {
                 if (node.neighbor_counter == node.real_neighbors) {
                     node.neighbor_counter = 0;
                     node.round_counter++;
-                    if (node.round_counter < node.neighbors.length)
+                    if (node.round_counter == node.neighbors.length) initialized[node.physID] = true;
+                    if (node.round_counter <= node.neighbors.length)
                         for (int i = 0; i < node.neighbors.length; i++)
-                            if (node.neighbors[i] != -1) node.sendMsg(new RoutingMessage(node.routingTable, node.physID), i);
+                            if (node.neighbors[i] != -1) {
+                                if (node.round_counter < node.neighbors.length) node.sendMsg(new RoutingMessage(node.routingTable, node.physID), i);
+                                else node.sendMsg(new ServiceMessage(node.physID, MessageType.INITIALIZED), i);
+                            }
                 }
                 break;
 
@@ -77,5 +86,11 @@ public class NodeMessageCallback implements DeliverCallback {
                 System.out.println("Unexpected message received (" + message.getMessageTypeCode() + ")!");
                 break;
         }
+    }
+
+    private boolean checkInitialized() {
+        boolean init = true;
+        for (int i = 0; i < initialized.length; i++) init &= initialized[i];
+        return init;
     }
 }

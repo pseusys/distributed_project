@@ -30,20 +30,6 @@ public class Launcher {
     // TODO: same superclass for all testing cases?
     public static void main(String[] args) throws InterruptedException {
         List<Node> nodes = new ArrayList<>();
-
-        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i], (node) -> {}));
-        for (int i = 0; i < num; i++) nodes.get(i).start();
-
-        // TODO: centralized solution, doesn't fit for a distributed system.
-        // TODO: exception if virtual node methods are called on node before algorithm finishes.
-        barrier(nodes);
-
-        int[][] distances = new int[num][num];
-        for (int i = 0; i < num; i++) {
-            Node node = nodes.get(i);
-            distances[i] = node.distances();
-            System.out.println(node);
-        }
         
         // If process 0, print message, otherwise forward to the next in the ring.
         TripleConsumer<String, Integer, Node> callback = (message, sender, self) -> {
@@ -57,15 +43,12 @@ public class Launcher {
                 self.sendText(newRecipient, newMessage);
             }
         };
-        for (int i = 0; i < num; i++) nodes.get(i).map(i, mapping[i], callback);
-        nodes.get(0).sendText(1, "Forwarding 0");
-    }
-
-    static private void barrier(List<Node> nodes) {
-        boolean proceed;
-        do {
-            proceed = true;
-            for (Node node: nodes) proceed &= node.initialized();
-        } while (proceed != true);
+        
+        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i], (node) -> {
+            System.out.println(node);
+            node.map(node.getPhysicalID(), mapping[node.getPhysicalID()], callback);
+            if (node.getPhysicalID() == 0) node.sendText(1, "Forwarding 0");
+        }));
+        for (int i = 0; i < num; i++) nodes.get(i).start();
     }
 }

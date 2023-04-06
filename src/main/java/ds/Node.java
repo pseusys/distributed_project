@@ -72,7 +72,6 @@ public class Node {
 
     // TODO: add representation methods.
     public int getVirtualID() {
-        if (!initialized()) throw new RuntimeException("Virtual ID should be invoked only after node initialization!");
         return virtID;
     }
 
@@ -82,10 +81,6 @@ public class Node {
             if (neighbors[i] != -1) sendMsg(new RoutingMessage(routingTable, physID), i);
     }
 
-    public boolean initialized() {
-        return round_counter == neighbors.length;
-    }
-
     public int[] distances() {
         int[] dists = new int[neighbors.length];
         for (int i = 0; i < neighbors.length; i++) dists[i] = routingTable.path(i).distance;
@@ -93,18 +88,18 @@ public class Node {
     }
 
     public void map(int id, int[] connections, TripleConsumer<String, Integer, Node> callback) {
-        if (!initialized()) throw new RuntimeException("Map should be invoked only after node initialization!");
         this.virtID = id;
         this.connections = connections;
         this.virtualCallback = callback;
     }
 
+    // TODO: add broadcast
     public void sendText(int recipient, String message) {
-        if (!initialized()) throw new RuntimeException("Send text should be invoked only after node initialization!");
         if (connections[recipient] != -1) forwardText(physID, recipient, message);
         else System.out.println("Virtual node " + virtID + " can't pass a message to node " + recipient + ": they aren't connected!");
     }
 
+    // TODO: add broadcast
     protected void forwardText(int sender, int recipient, String message) {
         try {
             int gate = routingTable.path(recipient).gate;
@@ -115,6 +110,7 @@ public class Node {
         }
     }
 
+    // TODO: add broadcast
     protected void sendMsg(BaseMessage msg, int neighbor) {
         try {
             byte[] byteMsg = msg.dump();
