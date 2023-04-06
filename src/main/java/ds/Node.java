@@ -1,13 +1,17 @@
 package ds;
 
+import ds.base.BaseMessage;
 import ds.misc.TripleConsumer;
 import ds.objects.DataMessage;
 import ds.objects.RoutingMessage;
 import ds.objects.RoutingTable;
+import ds.objects.ServiceMessage;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
+import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DeliverCallback;
@@ -18,31 +22,33 @@ import com.rabbitmq.client.Connection;
 // TODO: extend a virtual node interface and physical node interface
 public class Node {
     protected int physID, virtID;
-    protected int[] connections;
-    protected int[] neighbors;
-
     protected RoutingTable routingTable;
 
+    protected int[] connections;
+    protected int[] neighbors;
+    protected String[] callbackIDs;
+
+    protected final Connection connection;
     protected final Channel channel; //in
 
     protected int round_counter = 0;
     protected int neighbor_counter = 0; //for each round
     protected int real_neighbors = 0;
 
-    TripleConsumer<String, Integer, Node> virtualCallback;
-    protected String[] callbackIDs;
-
     DeliverCallback messageCallback;
+    TripleConsumer<String, Integer, Node> virtualCallback;
+    Consumer<Node> initializationCallback;
 
-    public Node(int id, int nodesNumber, int[] neighbors) {
+    public Node(int id, int nodesNumber, int[] neighbors, Consumer<Node> initializationCallback) {
         this.physID = id;
         this.neighbors = neighbors;
         this.routingTable = new RoutingTable(id, neighbors.length);
+        this.initializationCallback = initializationCallback;
 
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost("localhost");
-            Connection connection = factory.newConnection();
+            this.connection = factory.newConnection();
             this.channel = connection.createChannel();
 
             // we create a queue for every neighbor with name this.id + neighbor.id
@@ -59,10 +65,12 @@ public class Node {
         }
     }
 
+    // TODO: add representation methods.
     public int getPhysicalID() {
         return physID;
     }
 
+    // TODO: add representation methods.
     public int getVirtualID() {
         if (!initialized()) throw new RuntimeException("Virtual ID should be invoked only after node initialization!");
         return virtID;
@@ -107,7 +115,7 @@ public class Node {
         }
     }
 
-    protected void sendMsg(RoutingMessage msg, int neighbor) {
+    protected void sendMsg(BaseMessage msg, int neighbor) {
         try {
             byte[] byteMsg = msg.dump();
             channel.basicPublish("", physID + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
@@ -120,12 +128,35 @@ public class Node {
         try {
             for (int i = 0; i < neighbors.length; i++) {
                 if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
-                if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, callback, consumerTag -> {});
+                if (neighbors[i] != -1 && callback != null) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, callback, consumerTag -> {});
                 else callbackIDs[i] = null;
             }
         } catch (IOException e) {
             //TODO: change?
             throw new RuntimeException(e);
+        }
+    }
+
+    public void die(Integer cause) {
+        if (!connection.isOpen()) return;
+        if (cause != null) System.out.println("Physical node " + physID + " died because of node " + cause + "!");
+        else System.out.println("Physical node " + physID + " said 'uhhh' and just died!");
+        for (int i = 0; i < neighbors.length; i++)
+            if (neighbors[i] != -1) {
+                try {
+                    sendMsg(new ServiceMessage(physID, ServiceMessage.MessageType.CASCADE_DEATH), i);
+                    this.channel.queueDelete(physID + "-" + i);
+                } catch (IOException e) {
+                    // TODO: do something else?
+                    e.printStackTrace();
+                } catch (AlreadyClosedException e) {
+                    // Do nothing, queue already deleted.
+                }
+            }
+        try {
+            connection.abort();
+        } catch (AlreadyClosedException e) {
+            // Do nothing, connection already closed.
         }
     }
 

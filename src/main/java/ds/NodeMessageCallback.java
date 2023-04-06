@@ -9,6 +9,7 @@ import ds.base.BaseMessage;
 import ds.objects.DataMessage;
 import ds.objects.RoutingMessage;
 import ds.objects.ServiceMessage;
+import ds.objects.ServiceMessage.MessageType;
 
 
 public class NodeMessageCallback implements DeliverCallback {
@@ -32,7 +33,20 @@ public class NodeMessageCallback implements DeliverCallback {
 
         switch (message.getMessageTypeCode()) {
             case ServiceMessage.code:
-                
+                ServiceMessage sm = (ServiceMessage) message;
+                switch (sm.type) {
+                    case INITIALIZED:
+                        node.initializationCallback.accept(node);
+                        break;
+                    
+                    case CASCADE_DEATH:
+                        node.die(sm.sender);
+                        break;
+
+                    default:
+                        System.out.println("Unexpected service message received (" + sm.type.name() + ")!");
+                        break;
+                }
                 break;
         
             case DataMessage.code:
@@ -60,7 +74,7 @@ public class NodeMessageCallback implements DeliverCallback {
                 break;
 
             default:
-                System.out.println("Undefined message received (" + message.getMessageTypeCode() + ")!");
+                System.out.println("Unexpected message received (" + message.getMessageTypeCode() + ")!");
                 break;
         }
     }

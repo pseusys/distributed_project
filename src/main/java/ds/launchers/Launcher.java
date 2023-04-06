@@ -31,7 +31,7 @@ public class Launcher {
     public static void main(String[] args) throws InterruptedException {
         List<Node> nodes = new ArrayList<>();
 
-        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i]));
+        for (int i = 0; i < num; i++) nodes.add(new Node(i, num, matrix[i], (node) -> {}));
         for (int i = 0; i < num; i++) nodes.get(i).start();
 
         // TODO: centralized solution, doesn't fit for a distributed system.
@@ -49,6 +49,7 @@ public class Launcher {
         TripleConsumer<String, Integer, Node> callback = (message, sender, self) -> {
             if (self.getVirtualID() == 0) {
                 System.out.println("Virtual node 0 passed the message '" + message + " -> 0' round the ring!");
+                self.die(null);
             } else {
                 String newMessage = message + " -> " + self.getVirtualID();
                 int newRecipient = self.getVirtualID() == num - 1 ? 0 : self.getVirtualID() + 1;
