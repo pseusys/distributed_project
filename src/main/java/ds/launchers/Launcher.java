@@ -43,12 +43,12 @@ public class Launcher {
         // If process 0, print message, otherwise forward to the next in the ring.
         TripleConsumer<String, Integer, Node> messageCallback = (message, sender, self) -> {
             if (self.getVirtualID() == 0) {
-                System.out.println("Virtual node 0 passed the message '" + message + " -> 0' round the ring!");
+                System.out.println(self.virtualRepresentation() + " passed the message '" + message + " -> 0' round the ring!");
                 self.die(null);
             } else {
                 String newMessage = message + " -> " + self.getVirtualID();
                 int newRecipient = self.getVirtualID() == num - 1 ? 0 : self.getVirtualID() + 1;
-                System.out.println("Virtual node " + self.getVirtualID() + " passes message '" + newMessage + "' to node " + newRecipient + "!");
+                System.out.println(self.virtualRepresentation() + " passes message '" + newMessage + "' to node " + newRecipient + "!");
                 self.sendTextVirtual(newMessage, newRecipient);
             }
         };

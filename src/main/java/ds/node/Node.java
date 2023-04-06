@@ -147,8 +147,8 @@ public class Node implements PhysicalNode, VirtualNode {
     @Override
     public void die(Integer cause) {
         if (!connection.isOpen()) return;
-        if (cause != null) System.out.println("Physical node " + physID + " died because of node " + cause + "!");
-        else System.out.println("Physical node " + physID + " said 'uhhh' and just died!");
+        if (cause != null) System.out.println(physicalRepresentation() + " died because of node " + cause + "!");
+        else System.out.println(physicalRepresentation() + " said 'uhhh' and just died!");
         broadcastMessagePhysical(new ServiceMessage(physID, ServiceMessage.MessageType.CASCADE_DEATH));
         deleteQueues();
         try {
@@ -179,7 +179,7 @@ public class Node implements PhysicalNode, VirtualNode {
     @Override
     public void sendMessageVirtual(BaseMessage message, int recipient) {
         if (connections[recipient] != -1) forwardMessageVirtual(message, recipient);
-        else System.out.println("Virtual node " + virtID + " can't pass a message to node " + recipient + ": they aren't connected!");
+        else System.out.println(virtualRepresentation() + " can't pass a message to node " + recipient + ": they aren't connected!");
     }
 
     @Override
