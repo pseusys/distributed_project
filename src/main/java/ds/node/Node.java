@@ -82,8 +82,8 @@ public class Node implements PhysicalNode, VirtualNode {
         try {
             int neighbors_count = 0;
             for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
-                this.channel.queueDeclare(physID + "-" + i, false, false, false, null);
-                this.channel.queueDeclare(i + "-" + physID, false, false, false, null);
+                channel.queueDeclare(physID + "-" + i, false, false, false, null);
+                channel.queueDeclare(i + "-" + physID, false, false, false, null);
                 neighbors_count++;
             }
             return neighbors_count;
@@ -97,7 +97,7 @@ public class Node implements PhysicalNode, VirtualNode {
         try {
             for (int i = 0; i < neighbors.length; i++) if (neighbors[i] != -1) {
                 try {
-                    this.channel.queueDelete(physID + "-" + i);
+                    channel.queueDelete(physID + "-" + i);
                 } catch (AlreadyClosedException e) {
                     // Do nothing, queue already deleted.
                 }
