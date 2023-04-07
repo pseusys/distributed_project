@@ -77,12 +77,12 @@ public class NodeMessageCallback implements DeliverCallback {
                 node.routingTable.update(rm.table, rm.sender);
                 if (neighbor_counter == real_neighbors) {
                     neighbor_counter = 0;
-                    round_counter++;
-                    if (round_counter == nodeNumber + 1) { // TODO: Pia, check this please, why it's nodeNumber + 1? Is it right? Will always work?
+                    if (round_counter == nodeNumber +1  ) { 
                         initialized[node.getPhysicalID()] = true;
                         node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
-                    } else if (round_counter <= nodeNumber) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
-                    // TODO: Pia, check this please, why if I have nodeNumber + 1 here, it's buggy again! Why?
+                    } else if (round_counter <= nodeNumber ) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
+                    round_counter++;
+                    
                 }
                 break;
 
