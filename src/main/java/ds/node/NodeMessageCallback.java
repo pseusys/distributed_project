@@ -2,8 +2,6 @@ package ds.node;
 
 import java.io.IOException;
 
-import javax.lang.model.util.ElementScanner6;
-
 import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.Delivery;
 
@@ -77,14 +75,13 @@ public class NodeMessageCallback implements DeliverCallback {
                 RoutingMessage rm = (RoutingMessage) message;
                 neighbor_counter++;
                 node.routingTable.update(rm.table, rm.sender);
-                if (round_counter == nodeNumber) { 
-                    initialized[node.getPhysicalID()] = true;
-                    node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
-                else if (neighbor_counter == real_neighbors) {
+                if (neighbor_counter == real_neighbors) {
                     neighbor_counter = 0;
+                    if (round_counter == nodeNumber + 1) {
+                        initialized[node.getPhysicalID()] = true;
+                        node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
+                    } else node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
                     round_counter++;
-                } else {
-                    node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
                 }
                 break;
 
