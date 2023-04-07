@@ -77,12 +77,11 @@ public class NodeMessageCallback implements DeliverCallback {
                 node.routingTable.update(rm.table, rm.sender);
                 if (neighbor_counter == real_neighbors) {
                     neighbor_counter = 0;
-                    if (round_counter == nodeNumber +1  ) { 
+                    if (round_counter == nodeNumber) { 
                         initialized[node.getPhysicalID()] = true;
                         node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
-                    } else if (round_counter <= nodeNumber ) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
+                    } else if (round_counter < nodeNumber) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
                     round_counter++;
-                    
                 }
                 break;
 
