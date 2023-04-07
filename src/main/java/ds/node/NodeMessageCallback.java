@@ -14,7 +14,7 @@ import ds.objects.ServiceMessage.MessageType;
 
 public class NodeMessageCallback implements DeliverCallback {
     private Node node;
-    private int round_counter = 0;
+    private int round_counter = -1;
     private int neighbor_counter = 0;
     private int real_neighbors = 0;
 
@@ -77,11 +77,11 @@ public class NodeMessageCallback implements DeliverCallback {
                 node.routingTable.update(rm.table, rm.sender);
                 if (neighbor_counter == real_neighbors) {
                     neighbor_counter = 0;
+                    round_counter++;
                     if (round_counter == nodeNumber + 1) {
                         initialized[node.getPhysicalID()] = true;
                         node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
                     } else node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
-                    round_counter++;
                 }
                 break;
 
