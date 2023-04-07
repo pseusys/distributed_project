@@ -26,7 +26,7 @@ public class NodeMessageCallback implements DeliverCallback {
         this.real_neighbors = real_neighbors;
         this.nodeNumber = node.nodesCount();
         this.initialized = new boolean[nodeNumber];
-        for (int i = 0; i < nodeNumber; i++) initialized[i] = neighbors[i] == -1;
+        for (int i = 0; i < nodeNumber; i++) initialized[i] = false;
     }
 
     @Override
@@ -44,6 +44,8 @@ public class NodeMessageCallback implements DeliverCallback {
                 ServiceMessage sm = (ServiceMessage) message;
                 switch (sm.type) {
                     case INITIALIZED:
+                        if (initialized[sm.sender]) break;
+                        node.broadcastMessagePhysical(sm);
                         initialized[sm.sender] = true;
                         if (checkInitialized()) node.initializationCallback.accept(node);
                         break;
@@ -76,7 +78,7 @@ public class NodeMessageCallback implements DeliverCallback {
                 if (neighbor_counter == real_neighbors) {
                     neighbor_counter = 0;
                     round_counter++;
-                    if (round_counter == nodeNumber) {
+                    if (round_counter == nodeNumber + 1) { // TODO: Pia, check this please, why it's nodeNumber + 1? Is it right? Will always work?
                         initialized[node.getPhysicalID()] = true;
                         node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
                     } else if (round_counter <= nodeNumber) node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));

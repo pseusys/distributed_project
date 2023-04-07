@@ -22,5 +22,4 @@ public class ServiceMessage extends BaseMessage {
     public byte getMessageTypeCode() {
         return code;
     }
-    
 }
