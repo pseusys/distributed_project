@@ -14,19 +14,21 @@ import ds.objects.ServiceMessage.MessageType;
 
 public class NodeMessageCallback implements DeliverCallback {
     private Node node;
-    private int round_counter = -1;
-    private int neighbor_counter = 0;
-    private int real_neighbors = 0;
+    private int round_counter = 0;
 
     private int nodeNumber;
+    private int[] neighbors;
+    private boolean[] received_from;
     private boolean[] initialized;
 
     protected NodeMessageCallback(Node node, int[] neighbors, int real_neighbors) {
         this.node = node;
-        this.real_neighbors = real_neighbors;
         this.nodeNumber = node.nodesCount();
+        this.neighbors = neighbors;
         this.initialized = new boolean[nodeNumber];
         for (int i = 0; i < nodeNumber; i++) initialized[i] = false;
+        this.received_from = new boolean[nodeNumber];
+        for (int i = 0; i < nodeNumber; i++) received_from[i] = neighbors[i] == -1 ? true : false;
     }
 
     @Override
@@ -47,7 +49,7 @@ public class NodeMessageCallback implements DeliverCallback {
                         if (initialized[sm.sender]) break;
                         node.broadcastMessagePhysical(sm);
                         initialized[sm.sender] = true;
-                        if (checkInitialized()) node.initializationCallback.accept(node);
+                        if (checkInitialized(initialized)) node.initializationCallback.accept(node);
                         break;
                     
                     case CASCADE_DEATH:
@@ -73,15 +75,18 @@ public class NodeMessageCallback implements DeliverCallback {
 
             case RoutingMessage.code:
                 RoutingMessage rm = (RoutingMessage) message;
-                neighbor_counter++;
+                if (received_from[rm.sender]) node.channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, true);
+                else node.channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 node.routingTable.update(rm.table, rm.sender);
-                if (neighbor_counter == real_neighbors) {
-                    neighbor_counter = 0;
-                    round_counter++;
-                    if (round_counter == nodeNumber + 1) {
+                received_from[rm.sender] = true;
+                if (checkInitialized(received_from)) {
+                    for (int i = 0; i < nodeNumber; i++) received_from[i] = neighbors[i] == -1 ? true : false;
+                    if (round_counter == nodeNumber) {
                         initialized[node.getPhysicalID()] = true;
                         node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
+                        if (checkInitialized(initialized)) node.initializationCallback.accept(node);
                     } else node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
+                    round_counter++;
                 }
                 break;
 
@@ -91,9 +96,9 @@ public class NodeMessageCallback implements DeliverCallback {
         }
     }
 
-    private boolean checkInitialized() {
+    private boolean checkInitialized(boolean[] arr) {
         boolean init = true;
-        for (int i = 0; i < nodeNumber; i++) init &= initialized[i];
+        for (int i = 0; i < arr.length; i++) init &= arr[i];
         return init;
     }
 }

@@ -29,7 +29,7 @@ public class Node implements PhysicalNode, VirtualNode {
     private final String[] callbackIDs;
 
     private final Connection connection;
-    private final Channel channel;
+    protected final Channel channel;
 
     protected final TripleConsumer<String, Integer, Node> virtualCallback;
     protected final Consumer<Node> initializationCallback;
@@ -61,7 +61,7 @@ public class Node implements PhysicalNode, VirtualNode {
         try {
             for (int i = 0; i < nodesCount(); i++) {
                 if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
-                if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, true, messageCallback, consumerTag -> {});
+                if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, false, messageCallback, consumerTag -> {});
                 else callbackIDs[i] = null;
             }
         } catch (IOException e) {

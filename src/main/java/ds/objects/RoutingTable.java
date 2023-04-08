@@ -2,6 +2,8 @@ package ds.objects;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 
 public class RoutingTable implements Serializable {
@@ -20,7 +22,7 @@ public class RoutingTable implements Serializable {
         }
     }
 
-    private final ArrayList<RoutingTableEntry> table = new ArrayList<RoutingTableEntry>();
+    private final List<RoutingTableEntry> table = Collections.synchronizedList(new ArrayList<RoutingTableEntry>());
 
     public RoutingTable(int current, int neighbors) {
         for (int i = 0; i < neighbors; i++) {
@@ -42,7 +44,7 @@ public class RoutingTable implements Serializable {
         throw new RuntimeException("Route to node " + node + " is not defined!");
     }
 
-    public void update(RoutingTable another, int sender) {
+    public synchronized void update(RoutingTable another, int sender) {
         for (RoutingTableEntry entry: another.table) {
             int pathIndex = -1;
             for (int i = 0; i < table.size(); i++) if (table.get(i).destination == entry.destination) {
