@@ -103,10 +103,11 @@ public abstract class ConsoleApp {
                 System.err.println("!!! " + cpe.getMessage());
             }
         }
+        scanner.close();
     }
 
     private void printCommandHelp() {
-        System.out.println("Application '" + this.getClass().getName() + "' supports the following commands:");
+        System.out.println("Application '" + getClass().getName() + "' supports the following commands:");
         for (Map.Entry<String, ImmutablePair<Boolean, String>> command: commands.entrySet()) {
             if (command.getKey().equals("")) System.out.println("   '<input>': " + command.getValue().right);
             else System.out.println("   '/" + command.getKey() + (command.getValue().left ? " <input>" : "") + "': " + command.getValue().right);

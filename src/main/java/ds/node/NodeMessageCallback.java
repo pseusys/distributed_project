@@ -1,0 +1,104 @@
+package ds.node;
+
+import java.io.IOException;
+
+import com.rabbitmq.client.DeliverCallback;
+import com.rabbitmq.client.Delivery;
+
+import ds.base.BaseMessage;
+import ds.objects.DataMessage;
+import ds.objects.RoutingMessage;
+import ds.objects.ServiceMessage;
+import ds.objects.ServiceMessage.MessageType;
+
+
+public class NodeMessageCallback implements DeliverCallback {
+    private Node node;
+    private int round_counter = 0;
+
+    private int nodeNumber;
+    private int[] neighbors;
+    private boolean[] received_from;
+    private boolean[] initialized;
+
+    protected NodeMessageCallback(Node node, int[] neighbors, int real_neighbors) {
+        this.node = node;
+        this.nodeNumber = node.nodesCount();
+        this.neighbors = neighbors;
+        this.initialized = new boolean[nodeNumber];
+        for (int i = 0; i < nodeNumber; i++) initialized[i] = false;
+        this.received_from = new boolean[nodeNumber];
+        for (int i = 0; i < nodeNumber; i++) received_from[i] = neighbors[i] == -1 ? true : false;
+    }
+
+    @Override
+    public void handle(String consumerTag, Delivery delivery) throws IOException {
+        BaseMessage message;
+        try {
+            message = BaseMessage.parse(delivery.getBody());
+        } catch (ClassNotFoundException e) {
+            // TODO: do something else?
+            throw new RuntimeException(e);
+        }
+
+        switch (message.getMessageTypeCode()) {
+            case ServiceMessage.code:
+                ServiceMessage sm = (ServiceMessage) message;
+                switch (sm.type) {
+                    case INITIALIZED:
+                        if (initialized[sm.sender]) break;
+                        node.broadcastMessagePhysical(sm);
+                        initialized[sm.sender] = true;
+                        if (checkInitialized(initialized)) node.initializationCallback.accept(node);
+                        break;
+                    
+                    case CASCADE_DEATH:
+                        node.die(sm.sender);
+                        break;
+
+                    default:
+                        System.out.println("Unexpected service message received (" + sm.type.name() + ")!");
+                        break;
+                }
+                break;
+        
+            case DataMessage.code:
+                DataMessage dm = (DataMessage) message;
+                if (dm.receiver == node.getPhysicalID()) {
+                    if (node.virtualCallback != null) node.virtualCallback.apply(dm.message, dm.sender, node);
+                    else System.out.println(node.physicalRepresentation() + " received a message, but it doesn't have a callback for it!");
+                } else {
+                    System.out.println(node.physicalRepresentation() + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
+                    node.forwardMessageVirtual(message, dm.receiver);
+                }
+                break;
+
+            case RoutingMessage.code:
+                RoutingMessage rm = (RoutingMessage) message;
+                if (received_from[rm.sender]) node.channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, true);
+                else node.channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                node.routingTable.update(rm.table, rm.sender);
+                received_from[rm.sender] = true;
+                if (checkInitialized(received_from)) {
+                    for (int i = 0; i < nodeNumber; i++) received_from[i] = neighbors[i] == -1 ? true : false;
+                    if (round_counter == nodeNumber) {
+                        initialized[node.getPhysicalID()] = true;
+                        node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
+                        if (checkInitialized(initialized)) node.initializationCallback.accept(node);
+                    } else node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
+                    round_counter++;
+                }
+                break;
+
+            default:
+                System.out.println("Unexpected message received (" + message.getMessageTypeCode() + ")!");
+                break;
+        }
+    }
+
+    private boolean checkInitialized(boolean[] arr) {
+        boolean init = true;
+        for (int i = 0; i < arr.length; i++) init &= arr[i];
+        return init;
+    }
+}
