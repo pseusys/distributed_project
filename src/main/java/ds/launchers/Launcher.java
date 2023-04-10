@@ -19,7 +19,6 @@ public class Launcher {
         {-1, 1, -1, -1, -1}
     };
 
-    // TODO: auto mapping?
     private static int[][] mapping = {
         {-1, 1, -1, -1, 1},
         {1, -1, 1, -1, -1},

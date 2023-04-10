@@ -49,7 +49,6 @@ public class NodeMessageCallback implements DeliverCallback {
         init(mappings, (idx) -> null);
     }
 
-    // TODO: reduce number of rounds? Check from what nodes info already received?
     @Override
     public void handle(String consumerTag, Delivery delivery) throws IOException {
         BaseMessage message;
@@ -141,6 +140,7 @@ public class NodeMessageCallback implements DeliverCallback {
         for (int i = 0; i < node.nodesCount(); i++) arr[i] = initializer.apply(i);
     }
 
+    // TODO: reduce number of rounds? Check from what nodes info already received?
     private void nextRound() {
         init(round_received, (idx) -> neighbors[idx] == -1);
         if (round_counter == node.nodesCount()) {
