@@ -24,8 +24,8 @@ public class NodeMessageCallback implements DeliverCallback {
     private boolean compute;
 
     private final int[] neighbors;
-    private final boolean[] round_received;
-    private final boolean[] initialized;
+    private final Boolean[] round_received;
+    private final Boolean[] initialized;
 
     private PermutationCalculator calculator;
     private final Channel channel;
@@ -39,12 +39,14 @@ public class NodeMessageCallback implements DeliverCallback {
         this.channel = channel;
         this.compute = connectivity != null;
         this.connectivity = connectivity;
-        this.round_received = new boolean[node.nodesCount()];
+        this.round_received = new Boolean[node.nodesCount()];
         init(round_received, (idx) -> neighbors[idx] == -1);
-        this.initialized = new boolean[node.nodesCount()];
+        this.initialized = new Boolean[node.nodesCount()];
         init(initialized, (idx) -> false);
         this.distances = new int[node.nodesCount()][];
+        init(distances, (idx) -> null);
         this.mappings = new int[node.nodesCount()][];
+        init(mappings, (idx) -> null);
     }
 
     // TODO: reduce number of rounds? Check from what nodes info already received?
@@ -67,7 +69,7 @@ public class NodeMessageCallback implements DeliverCallback {
                         if (initialized[sm.sender]) break;
                         node.broadcastMessagePhysical(sm);
                         initialized[sm.sender] = true;
-                        if (check(initialized)) node.initializationCallback.accept(node);
+                        if (check(initialized, (idx, val) -> val)) node.initializationCallback.accept(node);
                         break;
                     
                     case CASCADE_DEATH:
@@ -97,12 +99,12 @@ public class NodeMessageCallback implements DeliverCallback {
                     if (mappings[cm.sender] != null) break;
                     node.broadcastMessagePhysical(cm);
                     mappings[cm.sender] = cm.permutation;
-                    if (checkm(mappings, (idx, val) -> val != null)) chooseMapping();
+                    if (check(mappings, (idx, val) -> val != null)) chooseMapping();
                 } else {
                     if (distances[cm.sender] != null) break;
                     node.broadcastMessagePhysical(cm);
                     distances[cm.sender] = cm.permutation;
-                    if (checkm(distances, (idx, val) -> val != null)) computeMapping();
+                    if (check(distances, (idx, val) -> val != null)) computeMapping();
                 }
                 break;
 
@@ -111,7 +113,7 @@ public class NodeMessageCallback implements DeliverCallback {
                 ack = !round_received[rm.sender];
                 node.getRoutingTable().update(rm.table, rm.sender);
                 round_received[rm.sender] = true;
-                if (check(round_received)) nextRound();
+                if (check(round_received, (idx, val) -> val)) nextRound();
                 break;
 
             default:
@@ -129,21 +131,14 @@ public class NodeMessageCallback implements DeliverCallback {
         node.broadcastMessagePhysical(new RoutingMessage(node.getRoutingTable(), node.getPhysicalID()));
     }
 
-    // TODO: revise + rename;
-    private boolean check(boolean[] arr) {
-        boolean init = true;
-        for (int i = 0; i < arr.length; i++) init &= arr[i];
-        return init;
-    }
-
-    private void init(boolean[] arr, Function<Integer, Boolean> initializer) {
-        for (int i = 0; i < node.nodesCount(); i++) arr[i] = initializer.apply(i);
-    }
-
-    private boolean checkm(int[][] arr, BiFunction<Integer, int[], Boolean> comparator) {
+    private <T> boolean check(T[] arr, BiFunction<Integer, T, Boolean> comparator) {
         boolean init = true;
         for (int i = 0; i < arr.length; i++) init &= comparator.apply(i, arr[i]);
         return init;
+    }
+
+    private <T> void init(T[] arr, Function<Integer, T> initializer) {
+        for (int i = 0; i < node.nodesCount(); i++) arr[i] = initializer.apply(i);
     }
 
     private void nextRound() {
@@ -155,10 +150,10 @@ public class NodeMessageCallback implements DeliverCallback {
                 int[] dists = node.physicalDistances();
                 distances[node.getPhysicalID()] = dists;
                 node.broadcastMessagePhysical(new ConnectionMessage(dists, node.getPhysicalID(), false));
-                if (checkm(distances, (idx, val) -> val != null)) computeMapping();
+                if (check(distances, (idx, val) -> val != null)) computeMapping();
             } else {
                 node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
-                if (check(initialized)) node.initializationCallback.accept(node);
+                if (check(initialized, (idx, val) -> val)) node.initializationCallback.accept(node);
             }
         } else node.broadcastMessagePhysical(new RoutingMessage(node.getRoutingTable(), node.getPhysicalID()));
         round_counter++;
@@ -169,7 +164,7 @@ public class NodeMessageCallback implements DeliverCallback {
         int[] perm = calculator.calculateBestPermutationForShare(node.getPhysicalID());
         mappings[node.getPhysicalID()] = perm;
         node.broadcastMessagePhysical(new ConnectionMessage(perm, node.getPhysicalID(), true));
-        if (checkm(mappings, (idx, val) -> val != null)) chooseMapping();
+        if (check(mappings, (idx, val) -> val != null)) chooseMapping();
     }
 
     private void chooseMapping() {

@@ -1,10 +1,8 @@
 package ds.node;
 
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import ds.misc.TripleConsumer;
-import ds.objects.RoutingTable;
 
 
 public class NodeBuilder {
