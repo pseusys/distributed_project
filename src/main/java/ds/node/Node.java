@@ -15,40 +15,41 @@ import java.util.function.Consumer;
 import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.MessageProperties;
 import com.rabbitmq.client.Connection;
 
 
 public class Node implements PhysicalNode, VirtualNode {
-    private int physID, virtID;
-    protected final RoutingTable routingTable;
+    private Integer virtID;
+    private final Integer physID;
+    private final RoutingTable routingTable;
 
-    private final int[] connections;
+    private int[] connections;
+    private int[] mapping;
     private final int[] neighbors;
     private final String[] callbackIDs;
 
     private final Connection connection;
-    protected final Channel channel;
+    private final Channel channel;
 
     protected final TripleConsumer<String, Integer, Node> virtualCallback;
     protected final Consumer<Node> initializationCallback;
 
-    protected Node(int id, int nodesNumber, int[] neighbors, int[] connections, TripleConsumer<String, Integer, Node> virtualCallback, Consumer<Node> initializationCallback) {
-        this.physID = this.virtID = id;
+    protected Node(int physID, int nodesNumber, int[] neighbors, int[] connections, int[][] connectivity, int[] mapping, TripleConsumer<String, Integer, Node> virtualCallback, Consumer<Node> initializationCallback) {
+        this.physID = physID;
         this.neighbors = neighbors;
         this.connections = connections;
-        this.routingTable = new RoutingTable(id, nodesCount());
+        this.mapping = mapping;
+        this.routingTable = new RoutingTable(physID, nodesCount());
         this.initializationCallback = initializationCallback;
         this.virtualCallback = virtualCallback;
 
-        int real_neighbors = 0;
         try {
             ConnectionFactory factory = new ConnectionFactory();
             factory.setHost("localhost");
             this.connection = factory.newConnection();
             this.channel = connection.createChannel();
-            real_neighbors = createQueues();
+            createQueues();
         } catch (IOException | TimeoutException e) {
             // TODO: do something else?
             throw new RuntimeException(e);
@@ -56,7 +57,8 @@ public class Node implements PhysicalNode, VirtualNode {
 
         callbackIDs = new String[nodesNumber];
         for (int i = 0; i < nodesCount(); i++) callbackIDs[i] = null;
-        DeliverCallback messageCallback = new NodeMessageCallback(this, neighbors, real_neighbors);
+        if (mapping != null) setVirtualMappings(mapping, null);
+        NodeMessageCallback messageCallback = new NodeMessageCallback(this, neighbors, channel, connectivity);
 
         try {
             for (int i = 0; i < nodesCount(); i++) {
@@ -68,6 +70,12 @@ public class Node implements PhysicalNode, VirtualNode {
             //TODO: do something else?
             throw new RuntimeException(e);
         }
+
+        messageCallback.initialize();
+    }
+
+    public RoutingTable getRoutingTable() {
+        return routingTable;
     }
 
     public int nodesCount() {
@@ -79,18 +87,21 @@ public class Node implements PhysicalNode, VirtualNode {
         return "Node (physical: " + physID + ", virtual: " + virtID + ") with routing: " + routingTable;
     }
 
+    public void setVirtualMappings(int[] mapping, int[][] connectivity) {
+        for (int i = 0; i < mapping.length; i++) if (mapping[i] == physID) this.virtID = i;
+        if (connectivity != null) this.connections = connectivity[virtID];
+        this.mapping = mapping;
+    }
+
 
     // PHYSICAL UTILITIES:
 
-    private int createQueues() {
+    private void createQueues() {
         try {
-            int neighbors_count = 0;
             for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
                 channel.queueDeclare(physID + "-" + i, false, false, false, null);
                 channel.queueDeclare(i + "-" + physID, false, false, false, null);
-                neighbors_count++;
             }
-            return neighbors_count;
         } catch (IOException e) {
             // TODO: do something else? Maybe tighten the clause?
             throw new RuntimeException(e);
@@ -188,7 +199,7 @@ public class Node implements PhysicalNode, VirtualNode {
 
     @Override
     public void forwardMessageVirtual(BaseMessage message, int recipient) {
-        int gate = routingTable.path(recipient).gate;
+        int gate = routingTable.path(mapping[recipient]).gate;
         sendMessagePhysical(message, gate);
     }
 

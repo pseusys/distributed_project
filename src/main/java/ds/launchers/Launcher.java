@@ -1,18 +1,16 @@
 package ds.launchers;
 
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import ds.misc.TripleConsumer;
 import ds.node.Node;
 import ds.node.NodeBuilder;
-import ds.objects.RoutingMessage;
-import ds.objects.RoutingTable;
 
 
 public class Launcher {
     private static int num = 5; 
 
+    // TODO: true / false instead of int?
     private static int[][] matrix = {
         {-1, -1, 1, -1, -1},
         {-1, -1, 1, 1, 1},
@@ -33,13 +31,14 @@ public class Launcher {
     // TODO: same superclass for all testing cases?
     // TODO: add DEATH on exceptions.
     public static void main(String[] args) throws InterruptedException {
-        BiConsumer<Node, RoutingTable> creationCallback = (node, table) -> {
-            node.broadcastMessagePhysical(new RoutingMessage(table, node.getPhysicalID()));
-        };
-
         Consumer<Node> initializationCallback = (node) -> {
             System.out.println(node);
-            if (node.getPhysicalID() == 0) node.sendTextVirtual("Forwarding 0", 1);
+            if (node.getVirtualID() == 0) {
+                int receiver = 1;
+                String message = "Forwarding 0";
+                System.out.println(node.virtualRepresentation() + " sends message '" + message + "' to node " + receiver + "!");
+                node.sendTextVirtual(message, receiver);
+            }
         };
 
         // If process 0, print message, otherwise forward to the next in the ring.
@@ -55,11 +54,18 @@ public class Launcher {
             }
         };
 
+        //for (int i = 0; i < num; i++)
+        //    NodeBuilder.create(i, matrix[i])
+        //        .defineVirtual(new int[] {0, 1, 2, 3, 4}, mapping[i])
+        //        .afterInitialization(initializationCallback)
+        //        .onVirtualMessage(messageCallback)
+        //        .build(creationCallback);
+
         for (int i = 0; i < num; i++)
             NodeBuilder.create(i, matrix[i])
-                .defineVirtual(i, mapping[i])
+                .computeVirtual(mapping)
                 .afterInitialization(initializationCallback)
                 .onVirtualMessage(messageCallback)
-                .build(creationCallback);
+                .build();
     }
 }

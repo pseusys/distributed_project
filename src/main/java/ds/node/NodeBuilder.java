@@ -8,12 +8,14 @@ import ds.objects.RoutingTable;
 
 
 public class NodeBuilder {
-    private int physID, virtID;
+    private int physID;
     private int nodesNumber;
     private Boolean computeVirtual = null;
 
     private int[] connections;
+    private int[] mapping;
     private int[] neighbors;
+    private int[][] connectivity;
 
     TripleConsumer<String, Integer, Node> virtualCallback = (message, sender, self) -> {};
     Consumer<Node> initializationCallback = (node) -> {};
@@ -28,18 +30,18 @@ public class NodeBuilder {
         this.nodesNumber = neighbors.length;
     }
 
-    public NodeBuilder defineVirtual(int virtualID, int[] connections) {
-        this.virtID = virtualID;
+    public NodeBuilder defineVirtual(int[] mapping, int[] connections) {
+        this.mapping = mapping;
         this.connections = connections;
         this.computeVirtual = false;
         if (connections.length != nodesNumber) throw new RuntimeException("Connection length (" + connections.length + ") doesn't match nodes number (" + nodesNumber + ")!");
         return this;
     }
 
-    // TODO: implement
-    public NodeBuilder computeVirtual(int[][] mapping) {
+    public NodeBuilder computeVirtual(int[][] connectivity) {
         this.computeVirtual = true;
-        throw new UnsupportedOperationException("Unimplemented method 'computeVirtual'");
+        this.connectivity = connectivity;
+        return this;
     }
 
     public NodeBuilder afterInitialization(Consumer<Node> initializationCallback) {
@@ -52,10 +54,11 @@ public class NodeBuilder {
         return this;
     }
 
-    public Node build(BiConsumer<Node, RoutingTable> creationCallback) {
+    public Node build() {
         if (computeVirtual == null) throw new RuntimeException("Virtual topology must be defined or computed!");
-        Node node = new Node(physID, nodesNumber, neighbors, connections, virtualCallback, initializationCallback);
-        creationCallback.accept(node, node.routingTable);
+        Node node;
+        if (computeVirtual) node = new Node(physID, nodesNumber, neighbors, null, connectivity, null, virtualCallback, initializationCallback);
+        else node = new Node(physID, nodesNumber, neighbors, connections, null, mapping, virtualCallback, initializationCallback);
         return node;
     }
 }

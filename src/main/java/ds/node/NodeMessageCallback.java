@@ -1,11 +1,17 @@
 package ds.node;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
+import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.Delivery;
 
 import ds.base.BaseMessage;
+import ds.misc.PermutationCalculator;
+import ds.objects.ConnectionMessage;
 import ds.objects.DataMessage;
 import ds.objects.RoutingMessage;
 import ds.objects.ServiceMessage;
@@ -13,24 +19,35 @@ import ds.objects.ServiceMessage.MessageType;
 
 
 public class NodeMessageCallback implements DeliverCallback {
-    private Node node;
+    private final Node node;
     private int round_counter = 0;
+    private boolean compute;
 
-    private int nodeNumber;
-    private int[] neighbors;
-    private boolean[] received_from;
-    private boolean[] initialized;
+    private final int[] neighbors;
+    private final boolean[] round_received;
+    private final boolean[] initialized;
 
-    protected NodeMessageCallback(Node node, int[] neighbors, int real_neighbors) {
+    private PermutationCalculator calculator;
+    private final Channel channel;
+    private final int[][] connectivity;
+    private final int[][] distances;
+    private final int[][] mappings;
+
+    protected NodeMessageCallback(Node node, int[] neighbors, Channel channel, int[][] connectivity) {
         this.node = node;
-        this.nodeNumber = node.nodesCount();
         this.neighbors = neighbors;
-        this.initialized = new boolean[nodeNumber];
-        for (int i = 0; i < nodeNumber; i++) initialized[i] = false;
-        this.received_from = new boolean[nodeNumber];
-        for (int i = 0; i < nodeNumber; i++) received_from[i] = neighbors[i] == -1 ? true : false;
+        this.channel = channel;
+        this.compute = connectivity != null;
+        this.connectivity = connectivity;
+        this.round_received = new boolean[node.nodesCount()];
+        init(round_received, (idx) -> neighbors[idx] == -1);
+        this.initialized = new boolean[node.nodesCount()];
+        init(initialized, (idx) -> false);
+        this.distances = new int[node.nodesCount()][];
+        this.mappings = new int[node.nodesCount()][];
     }
 
+    // TODO: reduce number of rounds? Check from what nodes info already received?
     @Override
     public void handle(String consumerTag, Delivery delivery) throws IOException {
         BaseMessage message;
@@ -40,6 +57,7 @@ public class NodeMessageCallback implements DeliverCallback {
             // TODO: do something else?
             throw new RuntimeException(e);
         }
+        boolean ack = true;
 
         switch (message.getMessageTypeCode()) {
             case ServiceMessage.code:
@@ -49,7 +67,7 @@ public class NodeMessageCallback implements DeliverCallback {
                         if (initialized[sm.sender]) break;
                         node.broadcastMessagePhysical(sm);
                         initialized[sm.sender] = true;
-                        if (checkInitialized(initialized)) node.initializationCallback.accept(node);
+                        if (check(initialized)) node.initializationCallback.accept(node);
                         break;
                     
                     case CASCADE_DEATH:
@@ -64,41 +82,108 @@ public class NodeMessageCallback implements DeliverCallback {
         
             case DataMessage.code:
                 DataMessage dm = (DataMessage) message;
-                if (dm.receiver == node.getPhysicalID()) {
+                if (dm.receiver == node.getVirtualID()) {
                     if (node.virtualCallback != null) node.virtualCallback.apply(dm.message, dm.sender, node);
-                    else System.out.println(node.physicalRepresentation() + " received a message, but it doesn't have a callback for it!");
+                    else System.out.println(node.virtualRepresentation() + " received a message, but it doesn't have a callback for it!");
                 } else {
-                    System.out.println(node.physicalRepresentation() + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
+                    System.out.println(node.virtualRepresentation() + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
                     node.forwardMessageVirtual(message, dm.receiver);
+                }
+                break;
+
+            case ConnectionMessage.code:
+                ConnectionMessage cm = (ConnectionMessage) message;
+                if (cm.computed) {
+                    if (mappings[cm.sender] != null) break;
+                    node.broadcastMessagePhysical(cm);
+                    mappings[cm.sender] = cm.permutation;
+                    if (checkm(mappings, (idx, val) -> val != null)) chooseMapping();
+                } else {
+                    if (distances[cm.sender] != null) break;
+                    node.broadcastMessagePhysical(cm);
+                    distances[cm.sender] = cm.permutation;
+                    if (checkm(distances, (idx, val) -> val != null)) computeMapping();
                 }
                 break;
 
             case RoutingMessage.code:
                 RoutingMessage rm = (RoutingMessage) message;
-                if (received_from[rm.sender]) node.channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, true);
-                else node.channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                node.routingTable.update(rm.table, rm.sender);
-                received_from[rm.sender] = true;
-                if (checkInitialized(received_from)) {
-                    for (int i = 0; i < nodeNumber; i++) received_from[i] = neighbors[i] == -1 ? true : false;
-                    if (round_counter == nodeNumber) {
-                        initialized[node.getPhysicalID()] = true;
-                        node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
-                        if (checkInitialized(initialized)) node.initializationCallback.accept(node);
-                    } else node.broadcastMessagePhysical(new RoutingMessage(node.routingTable, node.getPhysicalID()));
-                    round_counter++;
-                }
+                ack = !round_received[rm.sender];
+                node.getRoutingTable().update(rm.table, rm.sender);
+                round_received[rm.sender] = true;
+                if (check(round_received)) nextRound();
                 break;
 
             default:
                 System.out.println("Unexpected message received (" + message.getMessageTypeCode() + ")!");
                 break;
         }
+
+        if (channel.isOpen()) {
+            if (ack) channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+            else channel.basicNack(delivery.getEnvelope().getDeliveryTag(), false, true);
+        }
     }
 
-    private boolean checkInitialized(boolean[] arr) {
+    protected void initialize() {
+        node.broadcastMessagePhysical(new RoutingMessage(node.getRoutingTable(), node.getPhysicalID()));
+    }
+
+    // TODO: revise + rename;
+    private boolean check(boolean[] arr) {
         boolean init = true;
         for (int i = 0; i < arr.length; i++) init &= arr[i];
         return init;
+    }
+
+    private void init(boolean[] arr, Function<Integer, Boolean> initializer) {
+        for (int i = 0; i < node.nodesCount(); i++) arr[i] = initializer.apply(i);
+    }
+
+    private boolean checkm(int[][] arr, BiFunction<Integer, int[], Boolean> comparator) {
+        boolean init = true;
+        for (int i = 0; i < arr.length; i++) init &= comparator.apply(i, arr[i]);
+        return init;
+    }
+
+    private void nextRound() {
+        init(round_received, (idx) -> neighbors[idx] == -1);
+        if (round_counter == node.nodesCount()) {
+            System.out.println(node.physicalRepresentation() + " has routes: " + Arrays.toString(node.physicalDistances()));
+            initialized[node.getPhysicalID()] = true;
+            if (compute) {
+                int[] dists = node.physicalDistances();
+                distances[node.getPhysicalID()] = dists;
+                node.broadcastMessagePhysical(new ConnectionMessage(dists, node.getPhysicalID(), false));
+                if (checkm(distances, (idx, val) -> val != null)) computeMapping();
+            } else {
+                node.broadcastMessagePhysical(new ServiceMessage(node.getPhysicalID(), MessageType.INITIALIZED));
+                if (check(initialized)) node.initializationCallback.accept(node);
+            }
+        } else node.broadcastMessagePhysical(new RoutingMessage(node.getRoutingTable(), node.getPhysicalID()));
+        round_counter++;
+    }
+
+    private void computeMapping() {
+        calculator = new PermutationCalculator(distances, connectivity);
+        int[] perm = calculator.calculateBestPermutationForShare(node.getPhysicalID());
+        mappings[node.getPhysicalID()] = perm;
+        node.broadcastMessagePhysical(new ConnectionMessage(perm, node.getPhysicalID(), true));
+        if (checkm(mappings, (idx, val) -> val != null)) chooseMapping();
+    }
+
+    private void chooseMapping() {
+        int[] minPerm = mappings[node.getPhysicalID()];
+        int minScore = calculator.calculatePermutationScore(minPerm);
+        for (int i = 0; i < mappings.length; i++) {
+            int curScore = calculator.calculatePermutationScore(mappings[i]);
+            if (curScore <= minScore) {
+                minScore = curScore;
+                minPerm = mappings[i];
+            }
+        }
+        System.out.println(node.physicalRepresentation() + " has chosen mapping: " + Arrays.toString(minPerm));
+        node.setVirtualMappings(minPerm, connectivity);
+        node.initializationCallback.accept(node);
     }
 }
