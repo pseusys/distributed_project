@@ -33,7 +33,7 @@ public class RoutingTable implements Serializable {
             } else {
                 gate = -1;
                 destination = i;
-                distance = 3000; // TODO: change to "undefined" value.
+                distance = Integer.MAX_VALUE;
             }
             table.add(new RoutingTableEntry(gate, destination, distance));
         }
