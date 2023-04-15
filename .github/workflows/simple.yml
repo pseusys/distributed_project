@@ -29,7 +29,7 @@ jobs:
         uses: namoshek/rabbitmq-github-action@v1
         with:
           version: '3.11'
-          ports: '5672:5672 -p 15672:15672'
+          ports: '5672:5672 15672:15672'
           container-name: 'Rabbitmq'
       
       - name: Run SimpleLauncher 💫
