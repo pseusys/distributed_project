@@ -13,7 +13,7 @@
 Build and install dependencies using:
 
 ```bash
-./gradlew build
+./gradlew build clean
 ```
 
 ## Build and run
