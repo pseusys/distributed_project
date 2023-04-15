@@ -7,7 +7,7 @@ import ds.node.Node;
 import ds.node.NodeBuilder;
 
 
-public class Launcher {
+public class SimpleLauncher {
     private static int num = 5; 
 
     // TODO: true / false instead of int?

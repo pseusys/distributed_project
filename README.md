@@ -5,7 +5,7 @@ Launch one of the launchers:
 ```bash
 ./gradlew -P mainClass=ds.MAIN_CLASS run
 ```
-, where `MAIN_CLASS` is a launcher classpath, for now the only option is `launchers.Launcher`.
+, where `MAIN_CLASS` is a launcher classpath, for now the only option is `launchers.SimpleLauncher`.
 
 Before running any launcher, RabbitMQ running is required, you can run it e.g. with this command:
 
