@@ -24,15 +24,21 @@ public class Node implements PhysicalNode, VirtualNode {
     private final Integer physID;
     private final RoutingTable routingTable;
 
+    // Virtual nodes this node is connected to.
     private int[] connections;
+    // Mapping of virtual nodes to physical nodes.
     private int[] mapping;
+    // Physical nodes this node is connected to.
     private final int[] neighbors;
-    private final String[] callbackIDs;
 
+    // IDs of subscriptions to queues.
+    private final String[] callbackIDs;
     private final Connection connection;
     private final Channel channel;
 
+    // What happens if we received a virtual message.
     protected final TripleConsumer<String, Integer, Node> virtualCallback;
+    // What happens when the system is initialized.
     protected final Consumer<Node> initializationCallback;
 
     protected Node(int physID, int nodesNumber, int[] neighbors, int[] connections, int[][] connectivity, int[] mapping, TripleConsumer<String, Integer, Node> virtualCallback, Consumer<Node> initializationCallback) {
@@ -51,8 +57,7 @@ public class Node implements PhysicalNode, VirtualNode {
             this.channel = connection.createChannel();
             createQueues();
         } catch (IOException | TimeoutException e) {
-            // TODO: do something else?
-            throw new RuntimeException(e);
+            throw new RuntimeException(physicalRepresentation() + " couldn't connect to RabbitMQ!");
         }
 
         callbackIDs = new String[nodesNumber];
@@ -61,16 +66,14 @@ public class Node implements PhysicalNode, VirtualNode {
         NodeMessageCallback messageCallback = new NodeMessageCallback(this, neighbors, channel, connectivity);
 
         try {
-            for (int i = 0; i < nodesCount(); i++) {
-                if (callbackIDs[i] != null) channel.basicCancel(callbackIDs[i]);
-                if (neighbors[i] != -1) callbackIDs[i] = channel.basicConsume(i + "-" + physID, false, messageCallback, consumerTag -> {});
-                else callbackIDs[i] = null;
-            }
+            for (int i = 0; i < nodesCount(); i++)
+                if (neighbors[i] != -1)
+                    callbackIDs[i] = channel.basicConsume(i + "-" + physID, false, messageCallback, consumerTag -> {});
         } catch (IOException e) {
-            //TODO: do something else?
-            throw new RuntimeException(e);
+            throw new RuntimeException(physicalRepresentation() + " couldn't consume messages from its queues!");
         }
 
+        // Starts the distributed Bellman-Ford algorithm.
         messageCallback.initialize();
     }
 
@@ -96,30 +99,22 @@ public class Node implements PhysicalNode, VirtualNode {
 
     // PHYSICAL UTILITIES:
 
-    private void createQueues() {
-        try {
-            for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
-                channel.queueDeclare(physID + "-" + i, false, false, false, null);
-                channel.queueDeclare(i + "-" + physID, false, false, false, null);
-            }
-        } catch (IOException e) {
-            // TODO: do something else? Maybe tighten the clause?
-            throw new RuntimeException(e);
+    private void createQueues() throws IOException {
+        for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
+            channel.queueDeclare(physID + "-" + i, false, false, false, null);
+            channel.queueDeclare(i + "-" + physID, false, false, false, null);
         }
     }
 
     private void deleteQueues() {
-        try {
-            for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
-                try {
-                    channel.queueDelete(physID + "-" + i);
-                } catch (AlreadyClosedException e) {
-                    // Do nothing, queue already deleted.
-                }
+        for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) {
+            try {
+                channel.queueDelete(physID + "-" + i);
+            } catch (IOException e) {
+                throw new RuntimeException(physicalRepresentation() + " couldn't delete one of the queues!");
+            } catch (AlreadyClosedException e) {
+                // Do nothing, queue already deleted.
             }
-        } catch (IOException e) {
-            // TODO: do something else? Maybe tighten the clause?
-            throw new RuntimeException(e);
         }
     }
 
@@ -149,14 +144,15 @@ public class Node implements PhysicalNode, VirtualNode {
             byte[] byteMsg = message.dump();
             channel.basicPublish("", physID + "-" + neighbor, MessageProperties.PERSISTENT_TEXT_PLAIN, byteMsg);
         } catch (IOException e) {
-            // TODO: do something else?
-            throw new RuntimeException(e);
+            throw new RuntimeException(physicalRepresentation() + " couldn't send a message!");
         }
     }
 
     @Override
     public void broadcastMessagePhysical(BaseMessage message) {
-        for (int i = 0; i < nodesCount(); i++) if (neighbors[i] != -1) sendMessagePhysical(message, i);
+        for (int i = 0; i < nodesCount(); i++)
+            if (neighbors[i] != -1)
+                sendMessagePhysical(message, i);
     }
 
     @Override
@@ -205,6 +201,8 @@ public class Node implements PhysicalNode, VirtualNode {
 
     @Override
     public void broadcastMessageVirtual(BaseMessage message) {
-        for (int i = 0; i < nodesCount(); i++) if (connections[i] != -1) sendMessageVirtual(message, i);
+        for (int i = 0; i < nodesCount(); i++)
+            if (connections[i] != -1)
+                sendMessageVirtual(message, i);
     }
 }

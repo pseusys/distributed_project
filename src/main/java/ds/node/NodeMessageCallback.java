@@ -39,6 +39,7 @@ public class NodeMessageCallback implements DeliverCallback {
         this.channel = channel;
         this.compute = connectivity != null;
         this.connectivity = connectivity;
+
         this.round_received = new Boolean[node.nodesCount()];
         init(round_received, (idx) -> neighbors[idx] == -1);
         this.initialized = new Boolean[node.nodesCount()];
@@ -55,8 +56,7 @@ public class NodeMessageCallback implements DeliverCallback {
         try {
             message = BaseMessage.parse(delivery.getBody());
         } catch (ClassNotFoundException e) {
-            // TODO: do something else?
-            throw new RuntimeException(e);
+            throw new RuntimeException(node.physicalRepresentation() + " couldn't parse a message it received!");
         }
         boolean ack = true;
 
@@ -94,6 +94,7 @@ public class NodeMessageCallback implements DeliverCallback {
 
             case ConnectionMessage.code:
                 ConnectionMessage cm = (ConnectionMessage) message;
+                // Computed mapping scores.
                 if (cm.computed) {
                     if (mappings[cm.sender] != null) break;
                     node.broadcastMessagePhysical(cm);
@@ -140,7 +141,7 @@ public class NodeMessageCallback implements DeliverCallback {
         for (int i = 0; i < node.nodesCount(); i++) arr[i] = initializer.apply(i);
     }
 
-    // TODO: reduce number of rounds? Check from what nodes info already received?
+    // Possible improvement: reduce number of rounds? Check from what nodes info already received?
     private void nextRound() {
         init(round_received, (idx) -> neighbors[idx] == -1);
         if (round_counter == node.nodesCount()) {
