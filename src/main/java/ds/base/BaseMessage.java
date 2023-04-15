@@ -9,8 +9,6 @@ import java.io.Serializable;
 
 
 public abstract class BaseMessage implements Serializable {
-    public abstract byte getMessageTypeCode();
-
     public static BaseMessage parse(byte[] bytes) throws IOException, ClassNotFoundException {
         try {
             ByteArrayInputStream byteStream = new ByteArrayInputStream(bytes);
