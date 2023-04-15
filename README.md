@@ -1,4 +1,4 @@
-# Distributed systems pproject
+# Distributed systems project
 
 [![BUILD](https://github.com/pseusys/distributed_project/actions/workflows/simple.yml/badge.svg)](https://github.com/pseusys/distributed_project/actions/workflows/simple.yml)
 
