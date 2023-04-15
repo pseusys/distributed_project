@@ -3,7 +3,7 @@
 Launch one of the launchers:
 
 ```bash
-./gradlew -P MAIN_CLASS=ds.MAIN_CLASS run
+./gradlew -P MAIN_CLASS=ds.MAIN_CLASS run [--args="default_physical line_virtual"]
 ```
 , where `MAIN_CLASS` is a launcher classpath, for now the only option is `launchers.SimpleLauncher`.
 

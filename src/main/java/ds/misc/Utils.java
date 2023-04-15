@@ -1,5 +1,9 @@
 package ds.misc;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,5 +26,24 @@ public class Utils {
             nums[j] = nums[i];
             nums[i] = temp;
         }
+    }
+
+    public static int[][] readMatrixFromResource(String resource) throws IOException {
+        System.out.println(resource);
+        InputStream resStream = Utils.class.getClassLoader().getResourceAsStream(resource);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(resStream));
+
+        String line;
+        ArrayList<ArrayList<Integer>> lines = new ArrayList<>();
+        while ((line = reader.readLine()) != null) {
+            ArrayList<Integer> values = new ArrayList<>();
+            for (String value: line.split(";")) values.add(Integer.parseInt(value));
+            lines.add(values);
+        }
+        
+        int[][] result = new int[lines.size()][];
+        for (int i = 0; i < lines.size(); i++)
+            result[i] = lines.get(i).stream().mapToInt(e -> e).toArray();
+        return result;
     }
 }
