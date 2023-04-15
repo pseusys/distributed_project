@@ -60,66 +60,57 @@ public class NodeMessageCallback implements DeliverCallback {
         }
         boolean ack = true;
 
-        switch (message.getMessageTypeCode()) {
-            case ServiceMessage.code:
-                ServiceMessage sm = (ServiceMessage) message;
-                switch (sm.type) {
-                    case INITIALIZED:
-                        if (initialized[sm.sender]) break;
-                        node.broadcastMessagePhysical(sm);
-                        initialized[sm.sender] = true;
-                        if (check(initialized, (idx, val) -> val)) node.initializationCallback.accept(node);
-                        break;
+        if (message.getClass().getName() == ServiceMessage.class.getName()) {
+            ServiceMessage sm = (ServiceMessage) message;
+            switch (sm.type) {
+                case INITIALIZED:
+                    if (initialized[sm.sender]) break;
+                    node.broadcastMessagePhysical(sm);
+                    initialized[sm.sender] = true;
+                    if (check(initialized, (idx, val) -> val)) node.initializationCallback.accept(node);
+                    break;
                     
-                    case CASCADE_DEATH:
-                        node.die(sm.sender);
-                        break;
+                case CASCADE_DEATH:
+                    node.die(sm.sender);
+                    break;
 
-                    default:
-                        System.out.println("Unexpected service message received (" + sm.type.name() + ")!");
-                        break;
-                }
-                break;
-        
-            case DataMessage.code:
-                DataMessage dm = (DataMessage) message;
-                if (dm.receiver == node.getVirtualID()) {
-                    if (node.virtualCallback != null) node.virtualCallback.apply(dm.message, dm.sender, node);
-                    else System.out.println(node.virtualRepresentation() + " received a message, but it doesn't have a callback for it!");
-                } else {
-                    System.out.println(node.virtualRepresentation() + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
-                    node.forwardMessageVirtual(message, dm.receiver);
-                }
-                break;
+                default:
+                    System.out.println("Unexpected service message received (" + sm.type.name() + ")!");
+                    break;
+            }
 
-            case ConnectionMessage.code:
-                ConnectionMessage cm = (ConnectionMessage) message;
-                // Computed mapping scores.
-                if (cm.computed) {
-                    if (mappings[cm.sender] != null) break;
-                    node.broadcastMessagePhysical(cm);
-                    mappings[cm.sender] = cm.permutation;
-                    if (check(mappings, (idx, val) -> val != null)) chooseMapping();
-                } else {
-                    if (distances[cm.sender] != null) break;
-                    node.broadcastMessagePhysical(cm);
-                    distances[cm.sender] = cm.permutation;
-                    if (check(distances, (idx, val) -> val != null)) computeMapping();
-                }
-                break;
+        } else if (message.getClass().getName() == DataMessage.class.getName()) {
+            DataMessage dm = (DataMessage) message;
+            if (dm.receiver == node.getVirtualID()) {
+                if (node.virtualCallback != null) node.virtualCallback.apply(dm.message, dm.sender, node);
+                else System.out.println(node.virtualRepresentation() + " received a message, but it doesn't have a callback for it!");
+            } else {
+                System.out.println(node.virtualRepresentation() + " forwards a message (from " + dm.sender + ", to: " + dm.receiver + ")!");
+                node.forwardMessageVirtual(message, dm.receiver);
+            }
 
-            case RoutingMessage.code:
-                RoutingMessage rm = (RoutingMessage) message;
-                ack = !round_received[rm.sender];
-                node.getRoutingTable().update(rm.table, rm.sender);
-                round_received[rm.sender] = true;
-                if (check(round_received, (idx, val) -> val)) nextRound();
-                break;
+        } else if (message.getClass().getName() == ConnectionMessage.class.getName()) {
+            ConnectionMessage cm = (ConnectionMessage) message;
+            // Computed mapping scores.
+            if (cm.computed && mappings[cm.sender] == null) {
+                node.broadcastMessagePhysical(cm);
+                mappings[cm.sender] = cm.permutation;
+                if (check(mappings, (idx, val) -> val != null)) chooseMapping();
+            }
+            if (!cm.computed && distances[cm.sender] == null) {
+                node.broadcastMessagePhysical(cm);
+                distances[cm.sender] = cm.permutation;
+                if (check(distances, (idx, val) -> val != null)) computeMapping();
+            }
 
-            default:
-                System.out.println("Unexpected message received (" + message.getMessageTypeCode() + ")!");
-                break;
-        }
+        } else if (message.getClass().getName() == RoutingMessage.class.getName()) {
+            RoutingMessage rm = (RoutingMessage) message;
+            ack = !round_received[rm.sender];
+            node.getRoutingTable().update(rm.table, rm.sender);
+            round_received[rm.sender] = true;
+            if (check(round_received, (idx, val) -> val)) nextRound();
+
+        } else System.out.println("Unexpected message received (" + message.getClass().getSimpleName() + ")!");
 
         if (channel.isOpen()) {
             if (ack) channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
