@@ -1,20 +1,63 @@
-# distributed_project
+# Distributed systems pproject
 
-Launch one of the launchers:
+## Requirements and building
+
+1. Gradle 7.6  
+   Can be installed with [this installation guide](https://gradle.org/install/#with-the-gradle-wrapper).  
+   The command will be `./gradlew wrapper --gradle-version=7.6 --distribution-type=bin`.  
+   Installation can be verified with `./gradlew --version`.
+2. JDK 11+  
+   Can be installed with [this installation guide](https://openjdk.org/install/).  
+   Installation can be verified with `java --version`.
+
+Build and install dependencies using:
 
 ```bash
-./gradlew -P MAIN_CLASS=ds.MAIN_CLASS run [--args="default_physical line_virtual"]
+./gradlew build
 ```
-, where `MAIN_CLASS` is a launcher classpath, for now the only option is `launchers.SimpleLauncher`.
 
-Before running any launcher, RabbitMQ running is required, you can run it e.g. with this command:
+## Build and run
+
+> NB! Every launcher needs `RabbitMQ` up and running on current host (localhost) on default ports (5672, 15672).  
+  To run `RabbitMQ`, the following command can be used:
 
 ```bash
 docker run -it --rm --name Rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management
 ```
 
-docker build -f docker/Dockerfile --rm -t getting-started .
+> Configuration files:  
+  Each launcher can accept two parameters or zero parameters (in that case the defaults will be used).  
+  First parameter is a configuration file (without file extension) (physical first, virtual second).  
+  These files should reside in `src/main/resources` directories.  
+  Files should contain physical and virtual configuration matrixes in `.CSV` format, where connected nodes are represented by `1` and not connected by `-1`.
 
-## TODOs
+### Simple launcher
 
-1. Read file IO.
+Simple launcher runs all the nodes in a single thread:
+
+```bash
+./gradlew -P MAIN_CLASS=ds.launchers.SimpleLauncher run [--args="PHYSICAL_CONFIG VIRTUAL_CONFIG"]
+```
+
+### Process launcher
+
+Process launcher runs all the nodes in different native processes (fork / join):
+
+```bash
+./gradlew -P MAIN_CLASS=ds.launchers.ProcessLauncher run [--args="PHYSICAL_CONFIG VIRTUAL_CONFIG"]
+```
+
+### Individual launcher
+
+Individual launcher runs a single node (gets its' id from `PHYSICAL_ID` environmental variable).  
+Can be used to run system on separate processes / machines / hosts / containers:
+
+```bash
+./gradlew -P MAIN_CLASS=ds.launchers.IndividualLauncher run [--args="PHYSICAL_CONFIG VIRTUAL_CONFIG"]
+```
+
+Run whole system using default configurations in separate Docker containers:
+
+```bash
+bash docker/run_containers.sh
+```

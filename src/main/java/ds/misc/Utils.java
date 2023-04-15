@@ -29,7 +29,7 @@ public class Utils {
     }
 
     public static int[][] readMatrixFromResource(String resource) throws IOException {
-        System.out.println(resource);
+        System.out.println("Reading resource configuration file: " + resource);
         InputStream resStream = Utils.class.getClassLoader().getResourceAsStream(resource);
         BufferedReader reader = new BufferedReader(new InputStreamReader(resStream));
 
