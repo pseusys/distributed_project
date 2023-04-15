@@ -1,0 +1,34 @@
+name: SIMPLE
+
+on:
+  push:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 11 🔧
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          distribution: 'adopt'
+
+      - name: Setup Gradle 🐘
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: 7.6
+
+      - name: Build with Gradle 🛠
+        run: ./gradlew build clean
+
+      - name: Launch RabbitMQ 🐇
+        run: |
+          docker run -itd --rm --name Rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management
+          while ! curl -f http://localhost:15672 > /dev/null 2> /dev/null; do sleep 1; done
+      
+      - name: Run SimpleLauncher 💫
+        run: ./gradlew -P MAIN_CLASS=ds.launchers.SimpleLauncher run
