@@ -1,5 +1,7 @@
 # Distributed systems pproject
 
+[![BUILD](https://github.com/pseusys/distributed_project/actions/workflows/simple.yml/badge.svg)](https://github.com/pseusys/distributed_project/actions/workflows/simple.yml)
+
 ## Requirements and building
 
 1. Gradle 7.6  

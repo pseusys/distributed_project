@@ -6,8 +6,8 @@ plugins {
 group 'ds'
 version project.hasProperty("VERSION") ? project.getProperty("VERSION") : "1.0-SNAPSHOT"
 
-def main_class =  project.getProperty("MAIN_CLASS")
-def base_name =  project.hasProperty("BASE_NAME") ? project.getProperty("BASE_NAME") : "distributed_project"
+def main_class = project.hasProperty("MAIN_CLASS") ? project.getProperty("MAIN_CLASS") : "NULL"
+def base_name = project.hasProperty("BASE_NAME") ? project.getProperty("BASE_NAME") : "distributed_project"
 
 repositories {
     mavenCentral()
