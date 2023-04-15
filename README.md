@@ -20,7 +20,7 @@ Build and install dependencies using:
 
 ## Build and run
 
-> NB! Every launcher needs `RabbitMQ` up and running on current host (localhost) on default ports (5672, 15672).  
+> NB! Every launcher needs `RabbitMQ 3.11` up and running on current host (localhost) on default ports (5672, 15672).  
 
 To run `RabbitMQ`, the following command can be used:
 
