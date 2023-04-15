@@ -21,10 +21,17 @@ Build and install dependencies using:
 ## Build and run
 
 > NB! Every launcher needs `RabbitMQ` up and running on current host (localhost) on default ports (5672, 15672).  
-  To run `RabbitMQ`, the following command can be used:
+
+To run `RabbitMQ`, the following command can be used:
 
 ```bash
 docker run -it --rm --name Rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management
+```
+
+In that case the following command can be used to check if `RabbitMQ` is available:
+
+```bash
+docker exec Rabbitmq rabbitmq-diagnostics -q check_running
 ```
 
 > Configuration files:  
