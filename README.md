@@ -3,7 +3,7 @@
 Launch one of the launchers:
 
 ```bash
-./gradlew -P mainClass=ds.MAIN_CLASS run
+./gradlew -P MAIN_CLASS=ds.MAIN_CLASS run
 ```
 , where `MAIN_CLASS` is a launcher classpath, for now the only option is `launchers.SimpleLauncher`.
 
@@ -13,8 +13,8 @@ Before running any launcher, RabbitMQ running is required, you can run it e.g. w
 docker run -it --rm --name Rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management
 ```
 
+docker build -f docker/Dockerfile --rm -t getting-started .
+
 ## TODOs
 
-1. In-code TODOs.
-2. Other tests (e.g. multithreading, Docker, other configurations, etc.).
-3. Consider using (or deleting!) files from `misc` directory AND dependencies.
+1. Read file IO.
