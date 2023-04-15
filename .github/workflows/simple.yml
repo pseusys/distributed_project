@@ -23,7 +23,7 @@ jobs:
           gradle-version: 7.6
 
       - name: Build with Gradle 🛠
-        run: build clean
+        run: ./gradlew build clean
 
       - name: Launch RabbitMQ 🐇
         run: docker run -itd --rm --name Rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.11-management
