@@ -51,7 +51,7 @@ public class NodeMessageCallback implements DeliverCallback {
     }
 
     @Override
-    public void handle(String consumerTag, Delivery delivery) throws IOException {
+    public synchronized void handle(String consumerTag, Delivery delivery) throws IOException {
         BaseMessage message;
         try {
             message = BaseMessage.parse(delivery.getBody());
